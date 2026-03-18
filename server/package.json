@@ -1,0 +1,22 @@
+{
+  "name": "zeno",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.27.0",
+  "dependencies": {
+    "@ai-sdk/google": "^3.0.43",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
+    "ai": "^6.0.116",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "tsx": "^4.21.0"
+  }
+}
