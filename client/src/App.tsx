@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "./components/ui/input"
 import {
   ArrowUp,
+  Brain,
   BrainIcon,
   Hamburger,
   PencilEdit01Icon,
@@ -126,6 +127,7 @@ export function App() {
     mutationFn: createChat,
     onSuccess: (response: string) => {
       setChatId(response)
+      setMessages([])
     },
   })
 
@@ -141,6 +143,12 @@ export function App() {
     <div className="my-10 flex min-h-svh min-w-screen flex-col items-center justify-start px-4 py-6">
       <div className="mb-20 w-full max-w-2xl">
         <NavBar onCreate={mutateChat}></NavBar>
+        {visibleMessages.length == 0 && (
+          <div className="flex h-screen w-full flex-col items-center justify-center pb-44 text-neutral-500">
+            <HugeiconsIcon icon={BrainIcon} className="size-10"></HugeiconsIcon>
+            <h1 className="text-xl">Let's brain storm with Zeno</h1>
+          </div>
+        )}
         {visibleMessages.map((msg) => {
           return (
             <div
