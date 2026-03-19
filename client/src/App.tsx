@@ -9,7 +9,7 @@ import {
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 interface Chat {
   messages: Message[]
@@ -47,7 +47,7 @@ async function createChat(): Promise<string> {
 
 function NavBar({ onCreate }: { onCreate: () => void }) {
   return (
-    <nav className="fixed top-0 left-1/2 flex w-full max-w-2xl -translate-x-1/2 justify-between bg-white py-2">
+    <nav className="fixed top-0 left-1/2 z-30 flex w-full max-w-2xl -translate-x-1/2 justify-between bg-white/95 pt-3 pb-2 backdrop-blur-sm">
       <Button
         variant="secondary"
         className="size-11 rounded-full text-neutral-600"
@@ -115,14 +115,17 @@ export function App() {
     },
   ])
 
+  const bottomRef = useRef<HTMLDivElement | null>(null)
   const [chatId, setChatId] = useState<string>("")
-  console.log("id:", chatId)
+
   const { mutate, isPending } = useMutation({
-    mutationFn: (msg: string) => getAiResponse(chatId, msg),
+    mutationFn: ({ chatId, msg }: { chatId: string; msg: string }) =>
+      getAiResponse(chatId, msg),
     onSuccess: (response) => {
       setMessages((prev) => [...prev, { role: "assistant", content: response }])
     },
   })
+
   const { mutate: mutateChat } = useMutation({
     mutationFn: createChat,
     onSuccess: (response: string) => {
@@ -131,40 +134,58 @@ export function App() {
     },
   })
 
-  const handleSend = (text: string) => {
+  const handleSend = async (text: string) => {
     const userMessage: Message = { role: "user", content: text }
     const newMessages = [...messages, userMessage]
+
+    let id = chatId
+    if (chatId === "") {
+      id = await createChat()
+      setChatId(id)
+    }
+
     setMessages(newMessages)
-    mutate(text)
+    mutate({ chatId: id, msg: text })
   }
   const visibleMessages = messages.filter((m) => m.role !== "system")
-
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
   return (
-    <div className="my-10 flex min-h-svh min-w-screen flex-col items-center justify-start px-4 py-6">
-      <div className="mb-20 w-full max-w-2xl">
+    <div className="flex min-h-svh min-w-screen flex-col items-center justify-start px-4 py-6">
+      <div className="mb-20 w-full max-w-2xl pt-16 pb-24">
         <NavBar onCreate={mutateChat}></NavBar>
-        {visibleMessages.length == 0 && (
-          <div className="flex h-screen w-full flex-col items-center justify-center pb-44 text-neutral-500">
-            <HugeiconsIcon icon={BrainIcon} className="size-10"></HugeiconsIcon>
-            <h1 className="text-xl">Let's brain storm with Zeno</h1>
-          </div>
-        )}
-        {visibleMessages.map((msg) => {
-          return (
-            <div
-              className={`my-4 flex rounded-xl ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`${msg.role === "user" ? "rounded-2xl bg-neutral-100 px-4 py-3" : ""}`}
-              >
-                {msg.content}
-              </div>
+        <div>
+          {visibleMessages.length == 0 && (
+            <div className="flex h-[40rem] w-full flex-col items-center justify-center text-neutral-500">
+              <HugeiconsIcon
+                icon={BrainIcon}
+                className="size-10"
+              ></HugeiconsIcon>
+              <h1 className="text-xl">Let's brain storm with Zeno</h1>
             </div>
-          )
-        })}
-        <div className="text-sm text-neutral-400">
+          )}
+          {visibleMessages.map((msg, idx) => {
+            return (
+              <div
+                className={`my-4 flex rounded-xl ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`${msg.role === "user" ? "rounded-2xl bg-neutral-100 px-4 py-3" : ""}`}
+                >
+                  {msg.content}
+                </div>
+                {idx === visibleMessages.length - 1 && (
+                  <div ref={bottomRef}></div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="mt-4 text-sm text-neutral-400">
           {isPending && (
-            <span className="flex gap-2">
+            <span className="flex animate-pulse items-center gap-2">
               <HugeiconsIcon icon={BrainIcon}></HugeiconsIcon>Thinking...
             </span>
           )}
