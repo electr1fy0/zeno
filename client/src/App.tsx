@@ -1,6 +1,14 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "./components/ui/input"
-import { ArrowUp, Brain03Icon, BrainIcon } from "@hugeicons/core-free-icons"
+import {
+  ArrowUp,
+  Brain03Icon,
+  BrainIcon,
+  PencilIcon,
+  Hamburger,
+  QuillWrite01Icon,
+  PencilEdit01Icon,
+} from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { QueryClient, useMutation, useQuery } from "@tanstack/react-query"
 import { useState } from "react"
@@ -28,6 +36,25 @@ async function getAiResponse(msg: string): Promise<string> {
   return data
 }
 
+function NavBar() {
+  return (
+    <nav className="flex w-full justify-between">
+      <Button
+        variant="secondary"
+        className="size-10 rounded-full text-neutral-600"
+      >
+        <HugeiconsIcon icon={Hamburger} strokeWidth={2}></HugeiconsIcon>
+      </Button>
+      <Button
+        variant="secondary"
+        className="size-10 rounded-full text-neutral-600"
+      >
+        <HugeiconsIcon icon={PencilEdit01Icon} strokeWidth={2}></HugeiconsIcon>
+      </Button>
+    </nav>
+  )
+}
+
 function ChatInput({
   onSend,
   isPending,
@@ -45,7 +72,7 @@ function ChatInput({
         onSend(inputMsg.trim())
         setInputMsg("")
       }}
-      className="fixed bottom-6 left-1/2 flex w-[calc(100%-3rem)] max-w-2xl -translate-x-1/2 items-center gap-1 rounded-full border border-neutral-300 bg-neutral-50 px-3 py-2 shadow-sm"
+      className="fixed bottom-6 left-1/2 z-20 flex w-[calc(100%-3rem)] max-w-2xl -translate-x-1/2 items-center gap-1 rounded-full border border-neutral-300 bg-neutral-50 px-3 py-2 shadow-sm"
     >
       <Input
         type="text"
@@ -94,8 +121,9 @@ export function App() {
   const visibleMessages = messages.filter((m) => m.role !== "system")
 
   return (
-    <div className="flex min-h-svh min-w-screen flex-col items-center justify-start py-10">
-      <div className="w-full max-w-2xl">
+    <div className="flex min-h-svh min-w-screen flex-col items-center justify-start px-4 py-6">
+      <div className="mb-20 w-full max-w-2xl">
+        <NavBar></NavBar>
         {visibleMessages.map((msg) => {
           return (
             <div
@@ -116,6 +144,7 @@ export function App() {
             </span>
           )}
         </div>
+        <div className="fixed bottom-0 left-0 z-10 h-10 w-full backdrop-blur-xs"></div>
       </div>
       <ChatInput onSend={handleSend} isPending={isPending}></ChatInput>
     </div>
