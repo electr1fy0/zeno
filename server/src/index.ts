@@ -15,6 +15,7 @@ const model = google("gemini-3.1-flash-lite-preview");
 
 type Chat = {
   id: number;
+  title?: string;
   messages: ModelMessage[];
 };
 
@@ -51,15 +52,43 @@ app.options("/chat/:id", (req, res) => {
   }
 });
 
+app.get("/history", async (req, res) => {
+  const history = Object.values(chats).map((chat) => {
+    return {
+      id: chat.id,
+      title: chat.title,
+    };
+  });
+
+  res.json(history);
+});
+
+const getTitle = async (msg: string): Promise<string> => {
+  const resp = await generateText({
+    model: model,
+    prompt:
+      "give me a single short chat title without any formatting describing this whole following message: " +
+      msg,
+  });
+  return resp.text;
+};
+
 app.post("/chat/:id", async (req, res) => {
   const id = parseInt(req.params.id);
 
   const { message } = req.body;
   console.log(message, id);
   console.log("chat: ", chats[id]);
+  const chat = chats[id];
+
+  if (!chat.title) {
+    chat.title = await getTitle(message);
+  }
   const aiResp = await getResponse(id, message);
+
   res.send(aiResp);
 });
+
 app.get("/chat", (req, res) => {
   let id = Math.floor(Math.random() * 100);
   console.log("id:", id);
