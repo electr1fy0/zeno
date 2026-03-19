@@ -2,15 +2,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "./components/ui/input"
 import {
   ArrowUp,
-  Brain03Icon,
   BrainIcon,
-  PencilIcon,
   Hamburger,
-  QuillWrite01Icon,
   PencilEdit01Icon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { QueryClient, useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 
 interface Chat {
@@ -22,12 +19,15 @@ type Message = {
   content: string
 }
 
-async function getAiResponse(msg: string): Promise<string> {
-  const resp = await fetch("http://localhost:3000/chat/32", {
-    method: "post",
-    body: JSON.stringify({ message: msg }),
-    headers: { "Content-Type": "application/json" },
-  })
+async function getAiResponse(chatId: string, msg: string): Promise<string> {
+  const resp = await fetch(
+    `http://localhost:3000/chat/${encodeURIComponent(chatId)}`,
+    {
+      method: "post",
+      body: JSON.stringify({ message: msg }),
+      headers: { "Content-Type": "application/json" },
+    }
+  )
 
   if (!resp.ok) throw new Error("failed to fetch ai resp")
 
@@ -36,18 +36,27 @@ async function getAiResponse(msg: string): Promise<string> {
   return data
 }
 
-function NavBar() {
+async function createChat(): Promise<string> {
+  const resp = await fetch("http://localhost:3000/chat", {
+    method: "get",
+  })
+  if (!resp.ok) throw new Error("failed to create a chat")
+  return resp.text()
+}
+
+function NavBar({ onCreate }: { onCreate: () => void }) {
   return (
-    <nav className="flex w-full justify-between">
+    <nav className="fixed top-0 left-1/2 flex w-full max-w-2xl -translate-x-1/2 justify-between bg-white py-2">
       <Button
         variant="secondary"
-        className="size-10 rounded-full text-neutral-600"
+        className="size-11 rounded-full text-neutral-600"
       >
         <HugeiconsIcon icon={Hamburger} strokeWidth={2}></HugeiconsIcon>
       </Button>
       <Button
         variant="secondary"
-        className="size-10 rounded-full text-neutral-600"
+        className="size-11 rounded-full text-neutral-600"
+        onClick={onCreate}
       >
         <HugeiconsIcon icon={PencilEdit01Icon} strokeWidth={2}></HugeiconsIcon>
       </Button>
@@ -105,10 +114,18 @@ export function App() {
     },
   ])
 
+  const [chatId, setChatId] = useState<string>("")
+  console.log("id:", chatId)
   const { mutate, isPending } = useMutation({
-    mutationFn: (msg: string) => getAiResponse(msg),
+    mutationFn: (msg: string) => getAiResponse(chatId, msg),
     onSuccess: (response) => {
       setMessages((prev) => [...prev, { role: "assistant", content: response }])
+    },
+  })
+  const { mutate: mutateChat } = useMutation({
+    mutationFn: createChat,
+    onSuccess: (response: string) => {
+      setChatId(response)
     },
   })
 
@@ -121,9 +138,9 @@ export function App() {
   const visibleMessages = messages.filter((m) => m.role !== "system")
 
   return (
-    <div className="flex min-h-svh min-w-screen flex-col items-center justify-start px-4 py-6">
+    <div className="my-10 flex min-h-svh min-w-screen flex-col items-center justify-start px-4 py-6">
       <div className="mb-20 w-full max-w-2xl">
-        <NavBar></NavBar>
+        <NavBar onCreate={mutateChat}></NavBar>
         {visibleMessages.map((msg) => {
           return (
             <div

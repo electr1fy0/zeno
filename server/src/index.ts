@@ -13,10 +13,10 @@ const model = google("gemini-3.1-flash-lite-preview");
 //   value: "such a nice day it is",
 // });
 
-interface Chat {
+type Chat = {
   id: number;
   messages: ModelMessage[];
-}
+};
 
 let chats: Record<number, Chat> = {};
 
@@ -38,20 +38,20 @@ async function getResponse(chatId: number, msg: string): Promise<string> {
 const app = express();
 
 app.use(express.json());
-
-app.options("/chat/:id", (req, res) => {
+app.use((req, res, next) => {
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type");
+
+  next();
+});
+app.options("/chat/:id", (req, res) => {
   if (req.method == "OPTIONS") {
     res.sendStatus(204);
   }
 });
 
 app.post("/chat/:id", async (req, res) => {
-  res.set("Access-Control-Allow-Origin", "*");
-  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type");
   const id = parseInt(req.params.id);
 
   const { message } = req.body;
@@ -60,12 +60,7 @@ app.post("/chat/:id", async (req, res) => {
   const aiResp = await getResponse(id, message);
   res.send(aiResp);
 });
-
 app.get("/chat", (req, res) => {
-  res.set("Access-Control-Allow-Origin", "*");
-  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type");
-
   let id = Math.floor(Math.random() * 100);
   console.log("id:", id);
   chats[id] = {
