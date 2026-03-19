@@ -1,9 +1,8 @@
 import express from "express";
-import { embed, type ModelMessage } from "ai";
+import { type ModelMessage } from "ai";
 import "dotenv/config";
-import { google, type GoogleEmbeddingModelOptions } from "@ai-sdk/google";
+import { google } from "@ai-sdk/google";
 import { generateText } from "ai";
-import "dotenv/config";
 
 // const model = google.embedding("gemini-embedding-2-preview");
 const model = google("gemini-3.1-flash-lite-preview");
@@ -22,11 +21,11 @@ type Chat = {
 let chats: Record<number, Chat> = {};
 
 async function getResponse(chatId: number, msg: string): Promise<string> {
-  let chat: Chat = chats[chatId];
+  const chat: Chat = chats[chatId];
   console.log(chat);
   chat.messages.push({ role: "user", content: msg });
 
-  const { text, reasoning } = await generateText({
+  const { text } = await generateText({
     model: model,
     messages: chat.messages,
   });
@@ -114,6 +113,10 @@ app.get("/chat", (req, res) => {
   };
   res.send(id);
   console.log(chats);
+});
+
+app.get("/ping", (req, res) => {
+  res.send("pong");
 });
 
 app.listen(3000, () => console.log("running..."));
