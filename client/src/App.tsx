@@ -12,6 +12,10 @@ import { useEffect, useRef, useState } from "react"
 import { SidebarProvider, SidebarTrigger } from "./components/ui/sidebar"
 import { AppSidebar } from "./components/app-sidebar"
 
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000"
+).replace(/\/$/, "")
+
 interface Chat {
   messages: Message[]
 }
@@ -23,7 +27,7 @@ type Message = {
 
 async function getAiResponse(chatId: string, msg: string): Promise<string> {
   const resp = await fetch(
-    `http://localhost:3000/chat/${encodeURIComponent(chatId)}`,
+    `${API_BASE_URL}/chat/${encodeURIComponent(chatId)}`,
     {
       method: "post",
       body: JSON.stringify({ message: msg }),
@@ -39,7 +43,7 @@ async function getAiResponse(chatId: string, msg: string): Promise<string> {
 }
 
 async function createChat(): Promise<string> {
-  const resp = await fetch("http://localhost:3000/chat", {
+  const resp = await fetch(`${API_BASE_URL}/chat`, {
     method: "get",
   })
   if (!resp.ok) throw new Error("failed to create a chat")
@@ -111,9 +115,7 @@ function ChatInput({
 }
 
 const getChat = async (chatId: string): Promise<Chat> => {
-  const resp = await fetch(
-    `http://localhost:3000/chat/${encodeURIComponent(chatId)}`
-  )
+  const resp = await fetch(`${API_BASE_URL}/chat/${encodeURIComponent(chatId)}`)
 
   if (!resp.ok) throw new Error("failed to fetch chat")
 

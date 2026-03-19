@@ -8,12 +8,16 @@ import {
 } from "@/components/ui/sidebar"
 import { useQuery } from "@tanstack/react-query"
 
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000"
+).replace(/\/$/, "")
+
 type HistoryItem = {
   id: string
   title: string
 }
 async function getChatHistory(): Promise<HistoryItem[]> {
-  const history = await fetch("http://localhost:3000/history")
+  const history = await fetch(`${API_BASE_URL}/history`)
 
   return history.json()
 }
