@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button"
+import { useQueryClient } from "@tanstack/react-query"
 import { Input } from "./components/ui/input"
 import {
   ArrowUp,
@@ -115,13 +116,13 @@ function ChatInput({
 }
 
 export function App() {
+  const queryClient = useQueryClient()
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "system",
       content: "don't use any markdown formatting in your output",
     },
   ])
-
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const [chatId, setChatId] = useState<string>("")
 
@@ -133,27 +134,25 @@ export function App() {
     },
   })
 
-  const { mutate: mutateChat } = useMutation({
+  const { mutate: mutateChat, mutateAsync: mutateChatAsync } = useMutation({
     mutationFn: createChat,
     onSuccess: (response: string) => {
       setChatId(response)
+      queryClient.invalidateQueries({ queryKey: ["history"] })
       setMessages([])
     },
   })
-
   const handleSend = async (text: string) => {
     const userMessage: Message = { role: "user", content: text }
     const newMessages = [...messages, userMessage]
-
     let id = chatId
-    if (chatId === "") {
-      id = await createChat()
-      setChatId(id)
+    if (!id) {
+      id = await mutateChatAsync()
     }
-
-    setMessages(newMessages)
     mutate({ chatId: id, msg: text })
+    setMessages(newMessages)
   }
+
   const visibleMessages = messages.filter((m) => m.role !== "system")
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -163,7 +162,12 @@ export function App() {
       <div className="flex min-h-svh min-w-screen flex-col items-center justify-start px-4 py-6">
         <AppSidebar></AppSidebar>
         <div className="mb-20 w-full max-w-2xl pt-16 pb-24">
-          <NavBar onCreate={mutateChat}></NavBar>
+          <NavBar
+            onCreate={() => {
+              setChatId("")
+              setMessages([])
+            }}
+          ></NavBar>
           <div>
             {visibleMessages.length == 0 && (
               <div className="flex h-120 w-full flex-col items-center justify-center text-neutral-500">
