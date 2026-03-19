@@ -4,17 +4,12 @@ import { Input } from "./components/ui/input"
 import {
   ArrowUp,
   BrainIcon,
-  Hamburger,
   PencilEdit01Icon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
-import {
-  Sidebar,
-  SidebarProvider,
-  SidebarTrigger,
-} from "./components/ui/sidebar"
+import { SidebarProvider, SidebarTrigger } from "./components/ui/sidebar"
 import { AppSidebar } from "./components/app-sidebar"
 
 interface Chat {
@@ -115,30 +110,51 @@ function ChatInput({
   )
 }
 
+const getChat = async (chatId: string): Promise<Chat> => {
+  const resp = await fetch(
+    `http://localhost:3000/chat/${encodeURIComponent(chatId)}`
+  )
+
+  if (!resp.ok) throw new Error("failed to fetch chat")
+
+  return resp.json()
+}
+
 export function App() {
   const queryClient = useQueryClient()
+  const [chatId, setChatId] = useState<string>("")
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "system",
       content: "don't use any markdown formatting in your output",
     },
   ])
+
   const bottomRef = useRef<HTMLDivElement | null>(null)
-  const [chatId, setChatId] = useState<string>("")
 
   const { mutate, isPending } = useMutation({
     mutationFn: ({ chatId, msg }: { chatId: string; msg: string }) =>
       getAiResponse(chatId, msg),
     onSuccess: (response) => {
       setMessages((prev) => [...prev, { role: "assistant", content: response }])
+      queryClient.invalidateQueries({ queryKey: ["history"] })
     },
   })
 
-  const { mutate: mutateChat, mutateAsync: mutateChatAsync } = useMutation({
+  const { data } = useQuery({
+    queryKey: ["messages", chatId],
+    queryFn: () => getChat(chatId),
+    enabled: !!chatId && !isPending,
+  })
+
+  useEffect(() => {
+    if (data && !isPending) setMessages(data.messages)
+  }, [data, isPending])
+
+  const { mutateAsync: mutateChatAsync } = useMutation({
     mutationFn: createChat,
     onSuccess: (response: string) => {
       setChatId(response)
-      queryClient.invalidateQueries({ queryKey: ["history"] })
       setMessages([])
     },
   })
@@ -153,6 +169,9 @@ export function App() {
     setMessages(newMessages)
   }
 
+  function changeId(id: string) {
+    setChatId(id)
+  }
   const visibleMessages = messages.filter((m) => m.role !== "system")
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -160,7 +179,7 @@ export function App() {
   return (
     <SidebarProvider>
       <div className="flex min-h-svh min-w-screen flex-col items-center justify-start px-4 py-6">
-        <AppSidebar></AppSidebar>
+        <AppSidebar onIdChange={changeId} />
         <div className="mb-20 w-full max-w-2xl pt-16 pb-24">
           <NavBar
             onCreate={() => {

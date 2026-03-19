@@ -73,6 +73,17 @@ const getTitle = async (msg: string): Promise<string> => {
   return resp.text;
 };
 
+app.get("/chat/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const chat = chats[id];
+
+  if (!chat) {
+    return res.status(404).json({ error: "chat not found" });
+  }
+
+  res.json(chat);
+});
+
 app.post("/chat/:id", async (req, res) => {
   const id = parseInt(req.params.id);
 
