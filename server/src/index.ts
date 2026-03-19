@@ -30,7 +30,7 @@ async function getResponse(msg: string): Promise<string> {
   chat.messages.push({ role: "user", content: msg });
   const { text, reasoning } = await generateText({
     model: model,
-    prompt: chat.messages,
+    messages: chat.messages,
   });
   chat.messages.push({ role: "assistant", content: text });
 
@@ -41,7 +41,19 @@ const app = express();
 
 app.use(express.json());
 
+app.options("/chat/:id", (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method == "OPTIONS") {
+    res.sendStatus(204);
+  }
+});
+
 app.post("/chat/:id", async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
   const { message } = req.body;
   console.log(message);
   const aiResp = await getResponse(message);
