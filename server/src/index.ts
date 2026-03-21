@@ -1,122 +1,28 @@
-import express from "express";
-import { type ModelMessage } from "ai";
+import express, { Router } from "express";
 import "dotenv/config";
-import { google } from "@ai-sdk/google";
-import { generateText } from "ai";
+import { connectDb, getDb } from "./db/db";
+import { router } from "./routes/routes";
 
-// const model = google.embedding("gemini-embedding-2-preview");
-const model = google("gemini-3.1-flash-lite-preview");
+async function main() {
+  await connectDb();
 
-// const { embedding } = await embed({
-//   model,
-//   value: "such a nice day it is",
-// });
+  const app = express();
 
-type Chat = {
-  id: number;
-  title?: string;
-  messages: ModelMessage[];
-};
+  app.use(express.json());
+  app.use((req, res, next) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
 
-let chats: Record<number, Chat> = {};
-
-async function getResponse(chatId: number, msg: string): Promise<string> {
-  const chat: Chat = chats[chatId];
-  console.log(chat);
-  chat.messages.push({ role: "user", content: msg });
-
-  const { text } = await generateText({
-    model: model,
-    messages: chat.messages,
+    next();
   });
 
-  chat.messages.push({ role: "assistant", content: text });
+  app.options("/", (req, res) => {
+    res.sendStatus(204);
+  });
+  app.use("/", router);
 
-  return text;
+  app.listen(3000, () => console.log("running..."));
 }
 
-const app = express();
-
-app.use(express.json());
-app.use((req, res, next) => {
-  res.set("Access-Control-Allow-Origin", "*");
-  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type");
-
-  next();
-});
-app.options("/chat/:id", (req, res) => {
-  if (req.method == "OPTIONS") {
-    res.sendStatus(204);
-  }
-});
-
-app.get("/history", async (req, res) => {
-  const history = Object.values(chats).map((chat) => {
-    return {
-      id: chat.id,
-      title: chat.title,
-    };
-  });
-
-  res.json(history);
-});
-
-const getTitle = async (msg: string): Promise<string> => {
-  const resp = await generateText({
-    model: model,
-    prompt:
-      "give me a single short chat title without any formatting describing this whole following message: " +
-      msg,
-  });
-  return resp.text;
-};
-
-app.get("/chat/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
-  const chat = chats[id];
-
-  if (!chat) {
-    return res.status(404).json({ error: "chat not found" });
-  }
-
-  res.json(chat);
-});
-
-app.post("/chat/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
-
-  const { message } = req.body;
-  console.log(message, id);
-  console.log("chat: ", chats[id]);
-  const chat = chats[id];
-
-  if (!chat.title) {
-    chat.title = await getTitle(message);
-  }
-  const aiResp = await getResponse(id, message);
-
-  res.send(aiResp);
-});
-
-app.get("/chat", (req, res) => {
-  let id = Math.floor(Math.random() * 100);
-  console.log("id:", id);
-  chats[id] = {
-    id: id,
-    messages: [
-      {
-        role: "system",
-        content: "dont use any markdown formatting in your output",
-      },
-    ],
-  };
-  res.send(id);
-  console.log(chats);
-});
-
-app.get("/ping", (req, res) => {
-  res.send("pong");
-});
-
-app.listen(3000, () => console.log("running..."));
+main();
