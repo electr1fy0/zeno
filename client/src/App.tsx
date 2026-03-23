@@ -1,183 +1,76 @@
 import { Button } from "@/components/ui/button"
 import { useQueryClient } from "@tanstack/react-query"
 import { Input } from "./components/ui/input"
-import {
-  ArrowUp,
-  BrainIcon,
-  PencilEdit01Icon,
-} from "@hugeicons/core-free-icons"
+import { ArrowUp, BrainIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
-import { SidebarProvider, SidebarTrigger } from "./components/ui/sidebar"
+import { SidebarProvider } from "./components/ui/sidebar"
 import { AppSidebar } from "./components/app-sidebar"
-
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000"
-).replace(/\/$/, "")
-
-interface Chat {
-  messages: Message[]
-}
-
-type Message = {
-  role: string
-  content: string
-}
-
-async function getAiResponse(chatId: string, msg: string): Promise<string> {
-  const resp = await fetch(
-    `${API_BASE_URL}/chat/${encodeURIComponent(chatId)}`,
-    {
-      method: "post",
-      body: JSON.stringify({ message: msg }),
-      headers: { "Content-Type": "application/json" },
-    }
-  )
-
-  if (!resp.ok) throw new Error("failed to fetch ai resp")
-
-  const data = await resp.text()
-  console.log("resp", data)
-  return data
-}
-
-async function createChat(): Promise<string> {
-  const resp = await fetch(`${API_BASE_URL}/chat`, {
-    method: "get",
-  })
-  if (!resp.ok) throw new Error("failed to create a chat")
-  return resp.text()
-}
-
-function NavBar({ onCreate }: { onCreate: () => void }) {
-  return (
-    <nav className="fixed top-0 left-1/2 z-30 flex w-full max-w-2xl -translate-x-1/2 justify-between bg-white/95 pt-3 pb-2 backdrop-blur-sm">
-      <Button
-        variant="secondary"
-        className="size-11 rounded-full text-neutral-600"
-      >
-        <SidebarTrigger>
-          {/*<HugeiconsIcon icon={Hamburger} strokeWidth={2}></HugeiconsIcon>*/}
-        </SidebarTrigger>
-      </Button>
-      <Button
-        variant="secondary"
-        className="size-11 rounded-full text-neutral-600"
-        onClick={onCreate}
-      >
-        <HugeiconsIcon icon={PencilEdit01Icon} strokeWidth={2}></HugeiconsIcon>
-      </Button>
-    </nav>
-  )
-}
-
-function ChatInput({
-  onSend,
-  isPending,
-}: {
-  onSend: (msg: string) => void
-  isPending: boolean
-}) {
-  const [inputMsg, setInputMsg] = useState("")
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (isPending || inputMsg.trim() == "") return
-        onSend(inputMsg.trim())
-        setInputMsg("")
-      }}
-      className="fixed bottom-6 left-1/2 z-20 flex w-[calc(100%-3rem)] max-w-2xl -translate-x-1/2 items-center gap-1 rounded-full border border-neutral-300 bg-neutral-50 px-3 py-2 shadow-sm"
-    >
-      <Input
-        type="text"
-        placeholder="Ask anything"
-        className="w-full border-none focus:ring-0 focus-visible:ring-0 md:text-base"
-        onChange={(e) => setInputMsg(e.target.value)}
-        value={inputMsg}
-        disabled={isPending}
-      ></Input>
-      <Button
-        size="icon"
-        className="size-9 rounded-full bg-neutral-200"
-        disabled={isPending}
-      >
-        <HugeiconsIcon
-          icon={ArrowUp}
-          className="text-neutral-600"
-          strokeWidth={3}
-        ></HugeiconsIcon>
-      </Button>
-    </form>
-  )
-}
-
-const getChat = async (chatId: string): Promise<Chat> => {
-  const resp = await fetch(`${API_BASE_URL}/chat/${encodeURIComponent(chatId)}`)
-
-  if (!resp.ok) throw new Error("failed to fetch chat")
-
-  return resp.json()
-}
+import { Routes, useParams, Route } from "react-router"
+import { NavBar } from "@/components/app-navbar"
+import type { Chat, Message } from "./types"
+import { createNewChat, getChatById, getMessageReply } from "./api/api"
+import { ChatInput } from "./components/chat-input"
 
 export function App() {
-  const queryClient = useQueryClient()
-  const [chatId, setChatId] = useState<string>("")
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "system",
-      content: "don't use any markdown formatting in your output",
-    },
-  ])
+  return (
+    <Routes>
+      <Route path="/" element={<Home></Home>}></Route>
+      <Route path="/chat/:id" element={<Home></Home>}></Route>
+      <Route path="/chat" element={<Home></Home>}></Route>
+    </Routes>
+  )
+}
 
+export function Home() {
+  const { id: paramId } = useParams()
+  const queryClient = useQueryClient()
+  const [chatId, setChatId] = useState<string>(paramId ?? "")
+  const [messages, setMessages] = useState<Message[]>([])
   const bottomRef = useRef<HTMLDivElement | null>(null)
+
+  const { data: chat } = useQuery({
+    queryKey: ["messages", chatId],
+    queryFn: () => getChatById(chatId),
+    enabled: !!chatId,
+  })
 
   const { mutate, isPending } = useMutation({
     mutationFn: ({ chatId, msg }: { chatId: string; msg: string }) =>
-      getAiResponse(chatId, msg),
+      getMessageReply(chatId, msg),
     onSuccess: (response) => {
       setMessages((prev) => [...prev, { role: "assistant", content: response }])
       queryClient.invalidateQueries({ queryKey: ["history"] })
     },
   })
 
-  const { data } = useQuery({
-    queryKey: ["messages", chatId],
-    queryFn: () => getChat(chatId),
-    enabled: !!chatId && !isPending,
-  })
-
-  useEffect(() => {
-    if (data && !isPending) setMessages(data.messages)
-  }, [data, isPending])
-
-  const { mutateAsync: mutateChatAsync } = useMutation({
-    mutationFn: createChat,
-    onSuccess: (response: string) => {
-      setChatId(response)
-      setMessages([])
+  const { mutate: createChat } = useMutation({
+    mutationFn: createNewChat,
+    onSuccess: (response: Chat) => {
+      setChatId(response._id)
+      setMessages(response.messages)
     },
   })
+
   const handleSend = async (text: string) => {
     const userMessage: Message = { role: "user", content: text }
     const newMessages = [...messages, userMessage]
-    let id = chatId
-    if (!id) {
-      id = await mutateChatAsync()
-    }
-    mutate({ chatId: id, msg: text })
+
+    createChat(text)
+
+    mutate({ chatId: chatId, msg: text })
     setMessages(newMessages)
   }
 
   function changeId(id: string) {
     setChatId(id)
   }
-  const visibleMessages = messages.filter((m) => m.role !== "system")
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
+
   return (
     <SidebarProvider>
       <div className="flex min-h-svh min-w-screen flex-col items-center justify-start px-4 py-6">
