@@ -1,51 +1,32 @@
 import type { Chat } from "@/types"
+import { apiRequest } from "./client"
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000"
-).replace(/\/$/, "")
+export type HistoryItem = {
+  _id: string
+  title?: string
+}
 
 export const getChatById = async (id: string): Promise<Chat> => {
-  const resp = await fetch(`${API_BASE_URL}/chat/${encodeURIComponent(id)}`)
-
-  if (!resp.ok) throw new Error("failed to fetch chat")
-
-  return resp.json()
+  return apiRequest<Chat>(`/chat/${encodeURIComponent(id)}`)
 }
 
-export async function createNewChat(msg: string): Promise<Chat> {
-  const resp = await fetch(`${API_BASE_URL}/chat`, {
-    method: "post",
-    body: JSON.stringify({ message: msg }),
+export const createNewChat = async (message: string): Promise<Chat> => {
+  return apiRequest<Chat>("/chat", {
+    method: "POST",
+    body: JSON.stringify({ message }),
   })
-  if (!resp.ok) throw new Error("failed to create a chat")
-  return resp.json()
 }
 
-export async function getMessageReply(
+export const sendMessage = async (
   chatId: string,
-  msg: string
-): Promise<string> {
-  const resp = await fetch(
-    `${API_BASE_URL}/chat/${encodeURIComponent(chatId)}`,
-    {
-      method: "post",
-      body: JSON.stringify({ message: msg }),
-      headers: { "Content-Type": "application/json" },
-    }
-  )
-
-  if (!resp.ok) throw new Error("failed to fetch ai resp")
-
-  const data = await resp.text()
-  console.log("resp", data)
-
-  return data
+  message: string
+): Promise<string> => {
+  return apiRequest<string>(`/chat/${encodeURIComponent(chatId)}`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  })
 }
 
-export async function getHistory(): Promise<Chat[]> {
-  const resp = await fetch(`${API_BASE_URL}/history`, {
-    method: "get",
-  })
-
-  return resp.json()
+export const getChatHistory = async (): Promise<HistoryItem[]> => {
+  return apiRequest<HistoryItem[]>("/history")
 }

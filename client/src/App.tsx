@@ -1,17 +1,14 @@
-import { Button } from "@/components/ui/button"
-import { useQueryClient } from "@tanstack/react-query"
-import { Input } from "./components/ui/input"
-import { ArrowUp, BrainIcon } from "@hugeicons/core-free-icons"
+import { BrainIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { useMutation, useQuery } from "@tanstack/react-query"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import { SidebarProvider } from "./components/ui/sidebar"
 import { AppSidebar } from "./components/app-sidebar"
-import { Routes, useParams, Route } from "react-router"
+import { Routes, useParams, Route, useNavigate } from "react-router"
 import { NavBar } from "@/components/app-navbar"
-import type { Chat, Message } from "./types"
-import { createNewChat, getChatById, getMessageReply } from "./api/api"
 import { ChatInput } from "./components/chat-input"
+import { useChatQuery } from "./hooks/queries/use-chat-query"
+import { useCreateChatMutation } from "./hooks/mutations/use-create-chat"
+import { useSendMessageMutation } from "./hooks/mutations/use-send-message"
 
 export function App() {
   return (
@@ -25,46 +22,35 @@ export function App() {
 
 export function Home() {
   const { id: paramId } = useParams()
-  const queryClient = useQueryClient()
-  const [chatId, setChatId] = useState<string>(paramId ?? "")
-  const [messages, setMessages] = useState<Message[]>([])
+  const navigate = useNavigate()
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
-  const { data: chat } = useQuery({
-    queryKey: ["messages", chatId],
-    queryFn: () => getChatById(chatId),
-    enabled: !!chatId,
-  })
+  const { data: chat } = useChatQuery(paramId)
 
-  const { mutate, isPending } = useMutation({
-    mutationFn: ({ chatId, msg }: { chatId: string; msg: string }) =>
-      getMessageReply(chatId, msg),
-    onSuccess: (response) => {
-      setMessages((prev) => [...prev, { role: "assistant", content: response }])
-      queryClient.invalidateQueries({ queryKey: ["history"] })
-    },
-  })
+  const createChat = useCreateChatMutation()
+  const sendMessageMutation = useSendMessageMutation()
 
-  const { mutate: createChat } = useMutation({
-    mutationFn: createNewChat,
-    onSuccess: (response: Chat) => {
-      setChatId(response._id)
-      setMessages(response.messages)
-    },
-  })
+  const isPending = createChat.isPending || sendMessageMutation.isPending
+  const messages = chat?.messages ?? []
 
   const handleSend = async (text: string) => {
-    const userMessage: Message = { role: "user", content: text }
-    const newMessages = [...messages, userMessage]
-
-    createChat(text)
-
-    mutate({ chatId: chatId, msg: text })
-    setMessages(newMessages)
+    if (!paramId) {
+      createChat.mutate(text, {
+        onSuccess: (newChat) => {
+          navigate(`/chat/${newChat._id}`, { replace: true })
+        },
+      })
+    } else {
+      sendMessageMutation.mutate({ chatId: paramId, message: text })
+    }
   }
 
-  function changeId(id: string) {
-    setChatId(id)
+  const handleNewChat = () => {
+    navigate("/chat", { replace: true })
+  }
+
+  const handleChatChange = (id: string) => {
+    navigate(`/chat/${id}`)
   }
 
   useEffect(() => {
@@ -74,16 +60,11 @@ export function Home() {
   return (
     <SidebarProvider>
       <div className="flex min-h-svh min-w-screen flex-col items-center justify-start px-4 py-6">
-        <AppSidebar onIdChange={changeId} />
+        <AppSidebar onIdChange={handleChatChange} />
         <div className="mb-20 w-full max-w-2xl pt-16 pb-24">
-          <NavBar
-            onCreate={() => {
-              setChatId("")
-              setMessages([])
-            }}
-          ></NavBar>
+          <NavBar onCreate={handleNewChat}></NavBar>
           <div>
-            {visibleMessages.length == 0 && (
+            {messages.length === 0 && (
               <div className="flex h-120 w-full flex-col items-center justify-center text-neutral-500">
                 <HugeiconsIcon
                   icon={BrainIcon}
@@ -92,9 +73,10 @@ export function Home() {
                 <h1 className="text-xl">Let's brain storm with Zeno</h1>
               </div>
             )}
-            {visibleMessages.map((msg, idx) => {
+            {messages.map((msg, idx) => {
               return (
                 <div
+                  key={idx}
                   className={`my-4 flex rounded-xl ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
@@ -102,9 +84,7 @@ export function Home() {
                   >
                     {msg.content}
                   </div>
-                  {idx === visibleMessages.length - 1 && (
-                    <div ref={bottomRef}></div>
-                  )}
+                  {idx === messages.length - 1 && <div ref={bottomRef}></div>}
                 </div>
               )
             })}

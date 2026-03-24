@@ -6,50 +6,35 @@ import {
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { useQuery } from "@tanstack/react-query"
-
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000"
-).replace(/\/$/, "")
-
-type HistoryItem = {
-  id: string
-  title: string
-}
-async function getChatHistory(): Promise<HistoryItem[]> {
-  const history = await fetch(`${API_BASE_URL}/history`)
-
-  return history.json()
-}
+import { useHistoryQuery } from "@/hooks/queries/use-history-query"
 
 export function AppSidebar({
   onIdChange,
 }: {
   onIdChange: (id: string) => void
 }) {
-  const query = useQuery({
-    queryKey: ["history"],
-    queryFn: getChatHistory,
-  })
-
+  const { data: history, isLoading } = useHistoryQuery()
   const { toggleSidebar } = useSidebar()
+
   return (
     <Sidebar>
       <SidebarHeader />
       <SidebarContent>
         <SidebarGroup>
-          {query.data?.map((item: HistoryItem) => {
+          {isLoading && (
+            <div className="px-4 py-2 text-sm text-neutral-400">Loading...</div>
+          )}
+          {history?.map((item) => {
             return (
-              <li key={item.id}>
+              <li key={item._id}>
                 <div
-                  className="my-1 w-full px-4 py-2 text-base text-neutral-500 hover:bg-neutral-100 focus-visible:ring-0 focus-visible:outline-0"
+                  className="my-1 w-full cursor-pointer px-4 py-2 text-base text-neutral-500 hover:bg-neutral-100 focus-visible:ring-0 focus-visible:outline-0"
                   onClick={() => {
-                    onIdChange(item.id)
-
+                    onIdChange(item._id)
                     toggleSidebar()
                   }}
                 >
-                  {item.title}
+                  {item.title || "Untitled Chat"}
                 </div>
               </li>
             )
