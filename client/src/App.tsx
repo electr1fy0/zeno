@@ -1,6 +1,7 @@
 import { BrainIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { useEffect, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { SidebarProvider } from "./components/ui/sidebar"
 import { AppSidebar } from "./components/app-sidebar"
 import { Routes, useParams, Route, useNavigate } from "react-router"
@@ -9,7 +10,7 @@ import { ChatInput } from "./components/chat-input"
 import { useChatQuery } from "./hooks/queries/use-chat-query"
 import { useCreateChatMutation } from "./hooks/mutations/use-create-chat"
 import { useSendMessageMutation } from "./hooks/mutations/use-send-message"
-import type { Message } from "./types"
+import type { Chat, Message } from "./types"
 export function App() {
   return (
     <Routes>
@@ -23,7 +24,9 @@ export function App() {
 export function Home() {
   const { id: paramId } = useParams()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const streamingChatIdRef = useRef<string | null>(null)
   const [pendingNewChatMessage, setPendingNewChatMessage] =
     useState<Message | null>(null)
 
@@ -45,15 +48,68 @@ export function Home() {
         content: text,
       })
 
-      createChat.mutate(text, {
-        onSuccess: (newChat) => {
-          setPendingNewChatMessage(null)
-          navigate(`/chat/${newChat._id}`, { replace: true })
+      createChat.mutate(
+        {
+          message: text,
+          onMeta: (chatId) => {
+            streamingChatIdRef.current = chatId
+            setPendingNewChatMessage(null)
+            queryClient.setQueryData(["chats", "detail", chatId], {
+              _id: chatId,
+              messages: [
+                {
+                  role: "user",
+                  content: text,
+                },
+                {
+                  role: "assistant",
+                  content: "",
+                },
+              ],
+            })
+            navigate(`/chat/${chatId}`, { replace: true })
+          },
+          onChunk: (chunk) => {
+            const chatId = streamingChatIdRef.current
+            if (!chatId) return
+
+            queryClient.setQueryData(
+              ["chats", "detail", chatId],
+              (currentChat: Chat | undefined) => {
+                if (!currentChat) return currentChat
+
+                const messages = [...currentChat.messages]
+                const lastMessage = messages.at(-1)
+
+                if (!lastMessage || lastMessage.role !== "assistant") {
+                  return currentChat
+                }
+
+                messages[messages.length - 1] = {
+                  ...lastMessage,
+                  content: lastMessage.content + chunk,
+                }
+
+                return {
+                  ...currentChat,
+                  messages,
+                }
+              }
+            )
+          },
         },
-        onError: () => {
-          setPendingNewChatMessage(null)
-        },
-      })
+        {
+          onSuccess: (newChat) => {
+            setPendingNewChatMessage(null)
+            streamingChatIdRef.current = null
+            navigate(`/chat/${newChat._id}`, { replace: true })
+          },
+          onError: () => {
+            setPendingNewChatMessage(null)
+            streamingChatIdRef.current = null
+          },
+        }
+      )
     } else {
       sendMessageMutation.mutate({ chatId: paramId, message: text })
     }
@@ -61,11 +117,13 @@ export function Home() {
 
   const handleNewChat = () => {
     setPendingNewChatMessage(null)
+    streamingChatIdRef.current = null
     navigate("/chat", { replace: true })
   }
 
   const handleChatChange = (id: string) => {
     setPendingNewChatMessage(null)
+    streamingChatIdRef.current = null
     navigate(`/chat/${id}`)
   }
 

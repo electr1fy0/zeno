@@ -1,29 +1,22 @@
-import express, { Router } from "express";
 import "dotenv/config";
-import { connectDb, getDb } from "./db/db";
-import { router } from "./routes/routes";
+import { app } from "./app";
+import { connectDb } from "./db/db";
 
 async function main() {
   await connectDb();
 
-  const app = express();
+  const port = Number(Bun.env.PORT ?? 3000);
 
-  app.use(express.json());
-  app.use((req, res, next) => {
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
-
-    next();
+  Bun.serve({
+    fetch: app.fetch,
+    port,
+    idleTimeout: 255,
   });
 
-  app.options("/", (req, res) => {
-    res.sendStatus(204);
-  });
-
-  app.use("/", router);
-
-  app.listen(3000, () => console.log("running..."));
+  console.log(`running on http://localhost:${port}`);
 }
 
-main();
+main().catch((error) => {
+  console.error("Failed to start server", error);
+  process.exit(1);
+});

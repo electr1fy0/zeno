@@ -12,7 +12,33 @@ export function useSendMessageMutation() {
 
   return useMutation({
     mutationFn: ({ chatId, message }: SendMessageParams) =>
-      sendMessage(chatId, message),
+      sendMessage(chatId, message, {
+        onChunk: (chunk) => {
+          queryClient.setQueryData(
+            ["chats", "detail", chatId],
+            (currentChat: Chat | undefined) => {
+              if (!currentChat) return currentChat
+
+              const messages = [...currentChat.messages]
+              const lastMessage = messages.at(-1)
+
+              if (!lastMessage || lastMessage.role !== "assistant") {
+                return currentChat
+              }
+
+              messages[messages.length - 1] = {
+                ...lastMessage,
+                content: lastMessage.content + chunk,
+              }
+
+              return {
+                ...currentChat,
+                messages,
+              }
+            }
+          )
+        },
+      }),
     onMutate: async ({ chatId, message }) => {
       await queryClient.cancelQueries({
         queryKey: ["chats", "detail", chatId],
@@ -30,32 +56,43 @@ export function useSendMessageMutation() {
           content: message,
         }
 
+        const assistantMessage: Message = {
+          role: "assistant",
+          content: "",
+        }
+
         queryClient.setQueryData(["chats", "detail", chatId], {
           ...previousChat,
-          messages: [...previousChat.messages, userMessage],
+          messages: [...previousChat.messages, userMessage, assistantMessage],
         })
       }
 
       return { previousChat }
     },
     onSuccess: (aiResponse, { chatId }) => {
-      const currentChat: Chat | undefined = queryClient.getQueryData([
-        "chats",
-        "detail",
-        chatId,
-      ])
+      queryClient.setQueryData(
+        ["chats", "detail", chatId],
+        (currentChat: Chat | undefined) => {
+          if (!currentChat) return currentChat
 
-      if (currentChat) {
-        const aiMessage: Message = {
-          role: "assistant",
-          content: aiResponse,
+          const messages = [...currentChat.messages]
+          const lastMessage = messages.at(-1)
+
+          if (!lastMessage || lastMessage.role !== "assistant") {
+            return currentChat
+          }
+
+          messages[messages.length - 1] = {
+            ...lastMessage,
+            content: aiResponse,
+          }
+
+          return {
+            ...currentChat,
+            messages,
+          }
         }
-
-        queryClient.setQueryData(["chats", "detail", chatId], {
-          ...currentChat,
-          messages: [...currentChat.messages, aiMessage],
-        })
-      }
+      )
 
       queryClient.invalidateQueries({ queryKey: ["chats", "history"] })
     },

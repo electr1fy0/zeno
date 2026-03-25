@@ -3,15 +3,10 @@ import { Chat } from "../types/types";
 import { getDb } from "./db";
 import { ModelMessage } from "ai";
 
-export async function getChatById(id: string): Promise<Chat> {
+export async function getChatById(id: string): Promise<Chat | null> {
   const db = getDb();
 
-  const chat = await db
-    .collection<Chat>("chats")
-    .findOne({ _id: new ObjectId(id) });
-  if (!chat) throw Error("failed to get chat by id");
-
-  return chat;
+  return db.collection<Chat>("chats").findOne({ _id: new ObjectId(id) });
 }
 
 export async function setTitleForChatById(id: ObjectId, title: string) {
@@ -36,10 +31,23 @@ export async function appendToChatById(id: ObjectId, message: ModelMessage) {
   );
 }
 
+type Task = {
+  title: string;
+  deadline: string;
+  done: boolean;
+};
+export async function addTask(title: string, deadline: string) {
+  const db = getDb();
+
+  await db
+    .collection<Task>("tasks")
+    .insertOne({ title: title, deadline: deadline, done: false });
+}
+
 export async function getChatsHistory(): Promise<Chat[]> {
   const db = getDb();
 
-  return await db.collection<Chat>("chats").find({}).toArray();
+  return db.collection<Chat>("chats").find({}).toArray();
 }
 
 export async function createNewChat(msg: ModelMessage): Promise<Chat> {

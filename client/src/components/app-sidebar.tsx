@@ -4,7 +4,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarHeader,
-  useSidebar,
 } from "@/components/ui/sidebar"
 import { useHistoryQuery } from "@/hooks/queries/use-history-query"
 import { Input } from "./ui/input"
@@ -19,7 +18,6 @@ export function AppSidebar({
   onIdChange: (id: string) => void
 }) {
   const { data: history, isLoading } = useHistoryQuery()
-  const { toggleSidebar } = useSidebar()
   const { id: paramId } = useParams()
   return (
     <Sidebar>
