@@ -1,6 +1,6 @@
 import { BrainIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { SidebarProvider } from "./components/ui/sidebar"
 import { AppSidebar } from "./components/app-sidebar"
 import { Routes, useParams, Route, useNavigate } from "react-router"
@@ -24,6 +24,8 @@ export function Home() {
   const { id: paramId } = useParams()
   const navigate = useNavigate()
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const [pendingNewChatMessage, setPendingNewChatMessage] =
+    useState<Message | null>(null)
 
   const { data: chat } = useChatQuery(paramId)
 
@@ -31,14 +33,25 @@ export function Home() {
   const sendMessageMutation = useSendMessageMutation()
 
   const isPending = createChat.isPending || sendMessageMutation.isPending
-  const messages = chat?.messages ?? []
-  console.log("messages:", chat?.messages)
+  const messages =
+    chat?.messages ??
+    (!paramId && pendingNewChatMessage ? [pendingNewChatMessage] : [])
+  const lastMessage = messages.at(-1)
 
   const handleSend = async (text: string) => {
     if (!paramId) {
+      setPendingNewChatMessage({
+        role: "user",
+        content: text,
+      })
+
       createChat.mutate(text, {
         onSuccess: (newChat) => {
+          setPendingNewChatMessage(null)
           navigate(`/chat/${newChat._id}`, { replace: true })
+        },
+        onError: () => {
+          setPendingNewChatMessage(null)
         },
       })
     } else {
@@ -47,16 +60,18 @@ export function Home() {
   }
 
   const handleNewChat = () => {
+    setPendingNewChatMessage(null)
     navigate("/chat", { replace: true })
   }
 
   const handleChatChange = (id: string) => {
+    setPendingNewChatMessage(null)
     navigate(`/chat/${id}`)
   }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+  }, [lastMessage?.content, lastMessage?.role, messages.length])
 
   return (
     <SidebarProvider>
@@ -78,7 +93,7 @@ export function Home() {
               return (
                 <div
                   key={idx}
-                  className={`my-4 flex rounded-xl text-neutral-600 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  className={`my-4 flex rounded-xl text-base text-neutral-600 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
                     className={`${msg.role === "user" ? "rounded-2xl bg-neutral-100 px-4 py-3" : ""}`}
