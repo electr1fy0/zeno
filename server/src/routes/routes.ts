@@ -8,19 +8,22 @@ import {
 } from "../db/queries";
 import { getAiReply, getTitle } from "../lib/lib";
 import { ModelMessage } from "ai";
+import { ObjectId } from "mongodb";
 
 const router = express.Router();
 
 // Sends the entire chat
 router.get("/chat/:id", async (req, res) => {
   const id = req.params.id;
-  const chat = getChatById(id);
+  const chat = await getChatById(id);
 
-  if (!chat) {
-    return res.status(404).json({ error: "chat not found" });
-  }
+  console.log("chat:", chat);
 
-  res.json(chat);
+  // if (!chat) {
+  //   return res.status(404).json({ error: "chat not found" });
+  // }
+  console.log("sending");
+  res.send(chat);
 });
 
 // new chat
@@ -39,7 +42,7 @@ router.post("/chat", async (req, res) => {
     role: "assistant",
     content: aiReply,
   };
-  appendToChatById(chat._id, wrappedReply);
+  await appendToChatById(chat._id, wrappedReply);
 
   chat.messages.push(wrappedReply);
   res.json(chat);
@@ -57,7 +60,7 @@ router.post("/chat/:id", async (req, res) => {
     content: message,
   };
 
-  await appendToChatById(id, wrappedMsg);
+  await appendToChatById(new ObjectId(id), wrappedMsg);
 
   const chat = await getChatById(id);
   if (!chat) {
@@ -65,7 +68,7 @@ router.post("/chat/:id", async (req, res) => {
   }
   if (!chat.title) {
     const title = await getTitle(message);
-    await setTitleForChatById(id, title);
+    await setTitleForChatById(new ObjectId(id), title);
   }
 
   const aiReply = await getAiReply(chat.messages);

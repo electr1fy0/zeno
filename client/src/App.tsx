@@ -9,7 +9,7 @@ import { ChatInput } from "./components/chat-input"
 import { useChatQuery } from "./hooks/queries/use-chat-query"
 import { useCreateChatMutation } from "./hooks/mutations/use-create-chat"
 import { useSendMessageMutation } from "./hooks/mutations/use-send-message"
-
+import type { Message } from "./types"
 export function App() {
   return (
     <Routes>
@@ -32,6 +32,7 @@ export function Home() {
 
   const isPending = createChat.isPending || sendMessageMutation.isPending
   const messages = chat?.messages ?? []
+  console.log("messages:", chat?.messages)
 
   const handleSend = async (text: string) => {
     if (!paramId) {

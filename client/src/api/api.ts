@@ -15,6 +15,7 @@ export const getChatById = async (id: string): Promise<Chat> => {
       `Failed to load chat: ${response.status} ${response.statusText}`
     )
   }
+
   return response.json()
 }
 
