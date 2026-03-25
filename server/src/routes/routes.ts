@@ -43,7 +43,10 @@ router.post("/chat", async (req, res) => {
     content: aiReply,
   };
   await appendToChatById(chat._id, wrappedReply);
-
+  if (!chat.title) {
+    const title = await getTitle(message);
+    await setTitleForChatById(chat._id, title);
+  }
   chat.messages.push(wrappedReply);
   res.json(chat);
 });
@@ -78,7 +81,7 @@ router.post("/chat/:id", async (req, res) => {
     content: aiReply,
   };
 
-  appendToChatById(id, wrappedReply);
+  appendToChatById(new ObjectId(id), wrappedReply);
 
   res.send(aiReply);
 });
