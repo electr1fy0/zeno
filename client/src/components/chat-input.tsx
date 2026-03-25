@@ -35,6 +35,7 @@ export function ChatInput({
         size="icon"
         className="size-9 rounded-full bg-neutral-200"
         disabled={isPending}
+        type="submit"
       >
         <HugeiconsIcon
           icon={ArrowUp}

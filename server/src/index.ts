@@ -20,6 +20,7 @@ async function main() {
   app.options("/", (req, res) => {
     res.sendStatus(204);
   });
+
   app.use("/", router);
 
   app.listen(3000, () => console.log("running..."));

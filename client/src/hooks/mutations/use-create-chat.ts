@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { createNewChat } from "@/api/api"
-import { queryKeys } from "@/lib/query-client"
 
 export function useCreateChatMutation() {
   const queryClient = useQueryClient()
@@ -8,9 +7,9 @@ export function useCreateChatMutation() {
   return useMutation({
     mutationFn: createNewChat,
     onSuccess: (newChat) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.chats.history() })
+      queryClient.invalidateQueries({ queryKey: ["chats", "history"] })
 
-      queryClient.setQueryData(queryKeys.chats.detail(newChat._id), newChat)
+      queryClient.setQueryData(["chats", "detail", newChat._id], newChat)
     },
   })
 }

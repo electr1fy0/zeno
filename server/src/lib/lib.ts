@@ -16,7 +16,10 @@ const getTitle = async (msg: string): Promise<string> => {
 async function getAiReply(messages: ModelMessage[]): Promise<string> {
   const { text } = await generateText({
     model,
-    messages,
+    messages: [
+      { role: "system", content: "dont use markdown in your output" },
+      ...messages,
+    ],
   });
 
   return text;

@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { sendMessage } from "@/api/api"
-import { queryKeys } from "@/lib/query-client"
 import type { Chat, Message } from "@/types"
 
 type SendMessageParams = {
@@ -16,12 +15,14 @@ export function useSendMessageMutation() {
       sendMessage(chatId, message),
     onMutate: async ({ chatId, message }) => {
       await queryClient.cancelQueries({
-        queryKey: queryKeys.chats.detail(chatId),
+        queryKey: ["chats", "detail", chatId],
       })
 
-      const previousChat = queryClient.getQueryData<Chat>(
-        queryKeys.chats.detail(chatId)
-      )
+      const previousChat: Chat | undefined = queryClient.getQueryData([
+        "chats",
+        "detail",
+        chatId,
+      ])
 
       if (previousChat) {
         const userMessage: Message = {
@@ -29,7 +30,7 @@ export function useSendMessageMutation() {
           content: message,
         }
 
-        queryClient.setQueryData<Chat>(queryKeys.chats.detail(chatId), {
+        queryClient.setQueryData(["chats", "detail", chatId], {
           ...previousChat,
           messages: [...previousChat.messages, userMessage],
         })
@@ -38,9 +39,11 @@ export function useSendMessageMutation() {
       return { previousChat }
     },
     onSuccess: (aiResponse, { chatId }) => {
-      const currentChat = queryClient.getQueryData<Chat>(
-        queryKeys.chats.detail(chatId)
-      )
+      const currentChat: Chat | undefined = queryClient.getQueryData([
+        "chats",
+        "detail",
+        chatId,
+      ])
 
       if (currentChat) {
         const aiMessage: Message = {
@@ -48,18 +51,18 @@ export function useSendMessageMutation() {
           content: aiResponse,
         }
 
-        queryClient.setQueryData<Chat>(queryKeys.chats.detail(chatId), {
+        queryClient.setQueryData(["chats", "detail", chatId], {
           ...currentChat,
           messages: [...currentChat.messages, aiMessage],
         })
       }
 
-      queryClient.invalidateQueries({ queryKey: queryKeys.chats.history() })
+      queryClient.invalidateQueries({ queryKey: ["chats", "history"] })
     },
     onError: (_error, { chatId }, context) => {
       if (context?.previousChat) {
         queryClient.setQueryData(
-          queryKeys.chats.detail(chatId),
+          ["chats", "detail", chatId],
           context.previousChat
         )
       }

@@ -24,7 +24,7 @@ router.get("/chat/:id", async (req, res) => {
 });
 
 // new chat
-router.get("/chat", async (req, res) => {
+router.post("/chat", async (req, res) => {
   const { message } = req.body;
 
   const wrappedMsg: ModelMessage = {
@@ -86,5 +86,7 @@ router.get("/history", async (req, res) => {
 
   res.json(chatsHistory);
 });
+
+router.get("/meow", (req, res) => res.send("meow"));
 
 export { router };

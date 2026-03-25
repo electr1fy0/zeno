@@ -15,10 +15,3 @@ export const queryClient = new QueryClient({
 })
 
 // Query keys factory
-export const queryKeys = {
-  chats: {
-    all: ["chats"] as const,
-    history: () => [...queryKeys.chats.all, "history"] as const,
-    detail: (id: string) => [...queryKeys.chats.all, "detail", id] as const,
-  },
-}

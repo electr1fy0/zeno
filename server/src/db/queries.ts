@@ -47,11 +47,13 @@ export async function createNewChat(msg: ModelMessage): Promise<Chat> {
     messages: [msg],
   });
 
-  const chat = await db
+  const mongoChat = await db
     .collection<Chat>("chats")
-    .findOne({ _id: insertedDoc.insertedId.toString() });
+    .findOne({ _id: insertedDoc.insertedId });
 
-  if (!chat) throw new Error("failed to create new chat");
+  if (!mongoChat) {
+    throw new Error("Failed to fetch newly created chat");
+  }
 
-  return chat;
+  return mongoChat;
 }

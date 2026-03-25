@@ -77,7 +77,7 @@ export function Home() {
               return (
                 <div
                   key={idx}
-                  className={`my-4 flex rounded-xl ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  className={`my-4 flex rounded-xl text-neutral-600 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
                     className={`${msg.role === "user" ? "rounded-2xl bg-neutral-100 px-4 py-3" : ""}`}
