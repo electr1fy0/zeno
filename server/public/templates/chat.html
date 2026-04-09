@@ -1,0 +1,113 @@
+<section class="chat-layout">
+  <aside class="chat-sidebar">
+    <div class="sidebar-top">
+      <div class="sidebar-head">
+        <span class="sidebar-logo-text">Zeno</span>
+        <button
+          type="button"
+          class="sidebar-compose-btn"
+          ng-click="vm.startNewChat()"
+          aria-label="New chat"
+        >
+          <i class="hgi-stroke hgi-pencil-edit-02"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <p class="sidebar-label">Recent chats</p>
+
+      <div class="sidebar-search">
+        <i class="hgi-stroke hgi-search-01 sidebar-search-icon"></i>
+        <input
+          type="text"
+          class="sidebar-search-input"
+          placeholder="Search chats"
+          ng-model="vm.searchQuery"
+        />
+      </div>
+
+      <div class="chat-history" ng-if="vm.history.length">
+        <button
+          type="button"
+          class="history-item"
+          ng-repeat="chat in vm.filteredHistory() track by chat._id"
+          ng-class="{ 'history-item--active': chat._id === vm.activeChatId }"
+          ng-click="vm.openChat(chat._id)"
+        >
+          <span class="history-title">{{ chat.title || "New chat" }}</span>
+        </button>
+      </div>
+
+      <div class="sidebar-empty" ng-if="!vm.history.length">
+        Your previous chats will appear here.
+      </div>
+
+      <div class="sidebar-empty" ng-if="vm.history.length && !vm.filteredHistory().length">
+        No chats match your search.
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user" ng-if="vm.currentUser">
+        <span class="sidebar-user-name">{{ vm.currentUser.username }}</span>
+        <button
+          type="button"
+          class="sidebar-logout-btn"
+          ng-click="vm.logout()"
+          aria-label="Logout"
+        >
+          <i class="hgi-stroke hgi-logout-03"></i>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <section class="chat-main" ng-class="{ 'chat-main--empty': !vm.messages.length }">
+    <div class="chat-scroll" id="chat-scroll">
+      <div class="chat-hero" ng-if="!vm.messages.length">
+        <h1>What can I help with?</h1>
+      </div>
+
+      <div class="message-stack" ng-if="vm.messages.length">
+        <article
+          class="message-row"
+          ng-repeat="message in vm.messages track by $index"
+          ng-class="{ 'message-row--user': message.role === 'user' }"
+        >
+          <div class="message-card">
+            <div class="message-copy" ng-bind="message.content"></div>
+          </div>
+        </article>
+
+        <article class="message-row" ng-if="vm.loading">
+          <div class="message-card message-card--thinking">
+            <div class="thinking-copy">Thinking...</div>
+          </div>
+        </article>
+      </div>
+    </div>
+
+    <div class="composer-wrap">
+      <form class="composer-shell" ng-submit="vm.sendMessage()" novalidate>
+        <textarea
+          class="composer-input"
+          rows="1"
+          placeholder="Ask anything"
+          ng-model="vm.draft"
+          ng-disabled="vm.loading"
+          zeno-autosize
+          ng-keydown="vm.handleComposerKeydown($event)"
+        ></textarea>
+        <button
+          type="submit"
+          class="composer-send"
+          ng-disabled="vm.loading || !vm.draft.trim()"
+          aria-label="Send"
+        >
+          <i class="hgi-stroke" ng-class="vm.loading ? 'hgi-loading-03' : 'hgi-sent'"></i>
+        </button>
+      </form>
+    </div>
+  </section>
+</section>

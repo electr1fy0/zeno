@@ -1,0 +1,76 @@
+<section class="auth-shell">
+  <div class="container-fluid px-0">
+    <div class="row g-4 align-items-stretch auth-layout">
+      <div class="col-lg-7">
+        <div class="auth-panel auth-panel--soft h-100 d-flex flex-column justify-content-between">
+          <div>
+            <p class="section-label">Get Started</p>
+            <h1 class="auth-display mb-3">Create a clean workspace that remembers what matters.</h1>
+            <p class="muted-copy auth-copy mb-0">
+              Register once and use chat to save notes, manage todos, and keep everything in one place.
+            </p>
+          </div>
+
+          <div class="auth-meta">
+            <div class="auth-meta-item">
+              <i class="hgi-stroke hgi-note-01 auth-meta-icon"></i>
+              <span>Save notes naturally</span>
+            </div>
+            <div class="auth-meta-item">
+              <i class="hgi-stroke hgi-task-01 auth-meta-icon"></i>
+              <span>Turn requests into tasks</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="auth-panel auth-card card-surface">
+          <div class="mb-4">
+            <p class="section-label">Register</p>
+            <h2>Create your workspace</h2>
+          </div>
+
+          <form class="auth-form" data-auth-mode="register" ng-submit="vm.register()" novalidate>
+            <div class="mb-3">
+              <label for="register-username" class="form-label">Username</label>
+              <input
+                id="register-username"
+                type="text"
+                class="form-control"
+                ng-model="vm.form.username"
+                required
+              />
+              <div class="invalid-feedback">Enter a username with at least 3 characters.</div>
+            </div>
+
+            <div class="mb-4">
+              <label for="register-password" class="form-label">Password</label>
+              <input
+                id="register-password"
+                type="password"
+                class="form-control"
+                ng-model="vm.form.password"
+                required
+              />
+              <div class="invalid-feedback">Enter a password with at least 4 characters.</div>
+            </div>
+
+            <div class="auth-form-error d-none"></div>
+
+            <div class="d-flex flex-column gap-3">
+              <button type="submit" class="btn btn-primary btn-lg auth-submit" ng-disabled="vm.loading">
+                <i class="hgi-stroke hgi-user-add-02 me-2"></i>
+                {{ vm.loading ? "Creating..." : "Register" }}
+              </button>
+              <div class="auth-switch">
+                <span class="muted-copy">Already have an account?</span>
+                <a href="/login" class="btn btn-outline-dark">Back to login</a>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

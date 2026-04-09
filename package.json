@@ -1,0 +1,26 @@
+{
+  "name": "zeno",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Simple Express and AngularJS CRUD app with session auth",
+  "scripts": {
+    "dev": "node --watch server/src/index.js",
+    "build": "node -e \"import('./server/src/index.js')\"",
+    "start": "node server/src/index.js"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^3.0.43",
+    "ai": "^6.0.116",
+    "angular": "^1.8.3",
+    "angular-route": "^1.8.3",
+    "bcryptjs": "^3.0.2",
+    "bootstrap": "^5.3.8",
+    "dotenv": "^17.3.1",
+    "express": "^5.1.0",
+    "express-session": "^1.18.2",
+    "jquery": "^4.0.0-rc.1",
+    "mongodb": "^7.1.0",
+    "zod": "^3.25.76"
+  }
+}
