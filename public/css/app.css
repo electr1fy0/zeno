@@ -478,6 +478,7 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   padding: 10px 12px;
   border-radius: 16px;
   background: #ffffff;
@@ -487,6 +488,30 @@ a {
 .sidebar-user-name {
   font-size: 0.9rem;
   font-weight: 400;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-user-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-delete-account-btn {
+  border: 0;
+  border-radius: 10px;
+  background: #fff1f2;
+  color: #b42318;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.sidebar-delete-account-btn:hover {
+  background: #ffe4e8;
 }
 
 .sidebar-logout-btn {

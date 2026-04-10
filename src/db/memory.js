@@ -6,10 +6,6 @@ function toObjectId(userId) {
   return new ObjectId(userId);
 }
 
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function toNoteSummary(note) {
   return {
     id: note._id.toHexString(),
@@ -85,6 +81,7 @@ async function searchNotes(userId, query, queryEmbedding) {
 async function findMatchingDocument(collectionName, userId, fieldName, query) {
   const collection = getDb().collection(collectionName);
   const trimmedQuery = query.trim();
+  const lowerQuery = trimmedQuery.toLowerCase();
   const userObjectId = toObjectId(userId);
 
   if (ObjectId.isValid(trimmedQuery)) {
@@ -98,14 +95,17 @@ async function findMatchingDocument(collectionName, userId, fieldName, query) {
     }
   }
 
-  const exactRegex = new RegExp("^" + escapeRegex(trimmedQuery) + "$", "i");
-  const exactMatches = await collection
+  const documents = await collection
     .find({
       userId: userObjectId,
-      [fieldName]: exactRegex,
     })
-    .limit(5)
+    .limit(50)
     .toArray();
+
+  const exactMatches = documents.filter((document) => {
+    const value = String(document[fieldName] || "").trim().toLowerCase();
+    return value === lowerQuery;
+  });
 
   if (exactMatches.length === 1) {
     return { status: "matched", document: exactMatches[0] };
@@ -118,14 +118,10 @@ async function findMatchingDocument(collectionName, userId, fieldName, query) {
     };
   }
 
-  const containsRegex = new RegExp(escapeRegex(trimmedQuery), "i");
-  const partialMatches = await collection
-    .find({
-      userId: userObjectId,
-      [fieldName]: containsRegex,
-    })
-    .limit(5)
-    .toArray();
+  const partialMatches = documents.filter((document) => {
+    const value = String(document[fieldName] || "").toLowerCase();
+    return value.indexOf(lowerQuery) !== -1;
+  });
 
   if (partialMatches.length === 1) {
     return { status: "matched", document: partialMatches[0] };

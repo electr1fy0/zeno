@@ -23,6 +23,18 @@ function toPublicUser(user) {
   };
 }
 
+function clearSession(req, res) {
+  req.session.destroy((error) => {
+    if (error) {
+      res.status(500).json({ error: "Failed to clear session" });
+      return;
+    }
+
+    res.clearCookie("zeno.sid");
+    res.status(204).end();
+  });
+}
+
 authRouter.post("/register", async (req, res) => {
   const credentials = readCredentials(req.body);
   if (!credentials) {
@@ -90,15 +102,7 @@ authRouter.post("/login", async (req, res) => {
 });
 
 authRouter.post("/logout", (req, res) => {
-  req.session.destroy((error) => {
-    if (error) {
-      res.status(500).json({ error: "Failed to logout" });
-      return;
-    }
-
-    res.clearCookie("zeno.sid");
-    res.status(204).end();
-  });
+  clearSession(req, res);
 });
 
 authRouter.get("/me", async (req, res) => {
@@ -119,6 +123,22 @@ authRouter.get("/me", async (req, res) => {
   }
 
   res.json({ user: toPublicUser(user) });
+});
+
+authRouter.delete("/account", async (req, res) => {
+  if (!req.session.userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const userId = new ObjectId(req.session.userId);
+  const db = getDb();
+
+  await db.collection("chats").deleteMany({ userId });
+  await db.collection("notes").deleteMany({ userId });
+  await db.collection("users").deleteOne({ _id: userId });
+
+  clearSession(req, res);
 });
 
 export { authRouter };

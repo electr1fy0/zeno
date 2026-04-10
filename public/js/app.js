@@ -162,6 +162,26 @@
         });
       };
 
+      vm.deleteAccount = function () {
+        if (!window.confirm("Delete your account and all chats?")) {
+          return;
+        }
+
+        api("DELETE", "/api/auth/account")
+          .done(function () {
+            $rootScope.$applyAsync(function () {
+              setCurrentUser($rootScope, null);
+              vm.currentUser = null;
+              $location.path("/register");
+            });
+          })
+          .fail(function (xhr) {
+            $rootScope.$applyAsync(function () {
+              showFlash($rootScope, readError(xhr, "Could not delete account."));
+            });
+          });
+      };
+
       api("GET", "/api/auth/me")
         .done(function (response) {
           $rootScope.$applyAsync(function () {
@@ -316,6 +336,34 @@
             $location.path("/login");
           });
         });
+      };
+
+      vm.deleteAccount = function () {
+        if (!window.confirm("Delete your account and all chats?")) {
+          return;
+        }
+
+        api("DELETE", "/api/auth/account")
+          .done(function () {
+            $rootScope.$applyAsync(function () {
+              setCurrentUser($rootScope, null);
+              vm.currentUser = null;
+              vm.history = [];
+              vm.messages = [];
+              vm.activeChatId = "";
+              vm.draft = "";
+              $location.path("/register");
+            });
+          })
+          .fail(function (xhr) {
+            $rootScope.$applyAsync(function () {
+              if (sendToLoginIfUnauthorized(xhr, $location)) {
+                return;
+              }
+
+              showFlash($rootScope, readError(xhr, "Could not delete account."));
+            });
+          });
       };
 
       vm.startNewChat = function () {

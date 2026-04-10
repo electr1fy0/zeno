@@ -64,14 +64,23 @@
     <div class="sidebar-footer">
       <div class="sidebar-user" ng-if="vm.currentUser">
         <span class="sidebar-user-name">{{ vm.currentUser.username }}</span>
-        <button
-          type="button"
-          class="sidebar-logout-btn"
-          ng-click="vm.logout()"
-          aria-label="Logout"
-        >
-          <i class="hgi-stroke hgi-logout-03"></i>
-        </button>
+        <div class="sidebar-user-actions">
+          <button
+            type="button"
+            class="sidebar-delete-account-btn"
+            ng-click="vm.deleteAccount()"
+          >
+            Delete account
+          </button>
+          <button
+            type="button"
+            class="sidebar-logout-btn"
+            ng-click="vm.logout()"
+            aria-label="Logout"
+          >
+            <i class="hgi-stroke hgi-logout-03"></i>
+          </button>
+        </div>
       </div>
     </div>
   </aside>
