@@ -19,8 +19,7 @@ function parseId(id) {
 }
 
 function readMessage(body) {
-  const message = typeof body?.message === "string" ? body.message.trim() : "";
-  return message || null;
+  return body.message.trim() | null;
 }
 
 function buildChatTitle(message) {
@@ -39,14 +38,6 @@ function toChatResponse(chat) {
       content: message.content,
     })),
   };
-}
-
-function isInvalidAiCredentialError(error) {
-  return (
-    error?.name === "AI_APICallError" &&
-    typeof error?.message === "string" &&
-    error.message.toLowerCase().includes("api key not valid")
-  );
 }
 
 chatRouter.get("/", async (req, res) => {
@@ -84,10 +75,12 @@ chatRouter.get("/:id", async (req, res) => {
     return;
   }
 
-  const chat = await getDb().collection("chats").findOne({
-    _id: chatId,
-    userId: new ObjectId(userId),
-  });
+  const chat = await getDb()
+    .collection("chats")
+    .findOne({
+      _id: chatId,
+      userId: new ObjectId(userId),
+    });
 
   if (!chat) {
     res.status(404).json({ error: "Chat not found" });
@@ -118,24 +111,21 @@ chatRouter.post("/", async (req, res) => {
     };
     const title = buildChatTitle(message);
 
-    const result = await getDb().collection("chats").insertOne({
-      userId: new ObjectId(userId),
-      title,
-      messages: [userMessage, assistantMessage],
-      createdAt: now,
-      updatedAt: now,
-    });
+    const result = await getDb()
+      .collection("chats")
+      .insertOne({
+        userId: new ObjectId(userId),
+        title,
+        messages: [userMessage, assistantMessage],
+        createdAt: now,
+        updatedAt: now,
+      });
 
-    const chat = await getDb().collection("chats").findOne({ _id: result.insertedId });
+    const chat = await getDb()
+      .collection("chats")
+      .findOne({ _id: result.insertedId });
     res.status(201).json(toChatResponse(chat));
   } catch (error) {
-    if (isInvalidAiCredentialError(error)) {
-      res.status(502).json({
-        error: "Google AI API key is invalid. Update GOOGLE_GENERATIVE_AI_API_KEY in .env and restart the server.",
-      });
-      return;
-    }
-
     console.error("Failed to create chat", error);
     res.status(500).json({ error: "Could not start chat." });
   }
@@ -174,7 +164,10 @@ chatRouter.post("/:id/messages", async (req, res) => {
     const userMessage = { role: "user", content: message };
     const assistantMessage = {
       role: "assistant",
-      content: await getAssistantReply([...(chat.messages || []), userMessage], userId),
+      content: await getAssistantReply(
+        [...(chat.messages || []), userMessage],
+        userId,
+      ),
     };
 
     const setFields = {
@@ -203,13 +196,6 @@ chatRouter.post("/:id/messages", async (req, res) => {
 
     res.json(toChatResponse(updatedChat));
   } catch (error) {
-    if (isInvalidAiCredentialError(error)) {
-      res.status(502).json({
-        error: "Google AI API key is invalid. Update GOOGLE_GENERATIVE_AI_API_KEY in .env and restart the server.",
-      });
-      return;
-    }
-
     console.error("Failed to append chat message", error);
     res.status(500).json({ error: "Could not send message." });
   }
@@ -227,10 +213,12 @@ chatRouter.delete("/:id", async (req, res) => {
     return;
   }
 
-  const result = await getDb().collection("chats").deleteOne({
-    _id: chatId,
-    userId: new ObjectId(userId),
-  });
+  const result = await getDb()
+    .collection("chats")
+    .deleteOne({
+      _id: chatId,
+      userId: new ObjectId(userId),
+    });
 
   if (!result.deletedCount) {
     res.status(404).json({ error: "Chat not found" });

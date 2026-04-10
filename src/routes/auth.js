@@ -6,8 +6,8 @@ import { getDb } from "../db/db.js";
 const authRouter = express.Router();
 
 function readCredentials(body) {
-  const username = typeof body?.username === "string" ? body.username.trim() : "";
-  const password = typeof body?.password === "string" ? body.password.trim() : "";
+  const username = body.username.trim().toLowerCase();
+  const password = body.password.trim().toLowerCase();
 
   if (!username || !password) {
     return null;
@@ -74,7 +74,10 @@ authRouter.post("/login", async (req, res) => {
     return;
   }
 
-  const isValidPassword = await bcrypt.compare(credentials.password, user.passwordHash);
+  const isValidPassword = await bcrypt.compare(
+    credentials.password,
+    user.passwordHash,
+  );
   if (!isValidPassword) {
     res.status(401).json({ error: "Invalid username or password" });
     return;

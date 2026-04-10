@@ -1,7 +1,12 @@
 import { google } from "@ai-sdk/google";
 import { embed, generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
-import { createNote, listNotes, searchNotes, deleteNote } from "../db/memory.js";
+import {
+  createNote,
+  listNotes,
+  searchNotes,
+  deleteNote,
+} from "../db/memory.js";
 import { config } from "../config.js";
 
 function getTextModel() {
@@ -46,7 +51,11 @@ function buildTools(userId) {
       }),
       execute: async ({ content }) => ({
         status: "created",
-        note: await createNote(userId, content.trim(), await getEmbedding(content.trim())),
+        note: await createNote(
+          userId,
+          content.trim(),
+          await getEmbedding(content.trim()),
+        ),
       }),
     }),
     list_notes: tool({
@@ -69,7 +78,11 @@ function buildTools(userId) {
       execute: async ({ query }) => ({
         status: "searched",
         query,
-        notes: await searchNotes(userId, query.trim(), await getEmbedding(query.trim())),
+        notes: await searchNotes(
+          userId,
+          query.trim(),
+          await getEmbedding(query.trim()),
+        ),
       }),
     }),
     delete_note: tool({

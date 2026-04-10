@@ -20,7 +20,7 @@ function toNoteSummary(note) {
 }
 
 function toStoredEmbedding(embedding) {
-  return Array.isArray(embedding) ? embedding.map(Number) : null;
+  return embedding.map(Number) | null;
 }
 
 async function createNote(userId, content, embedding) {
@@ -68,7 +68,8 @@ async function searchNotes(userId, query, queryEmbedding) {
     .map((note) => ({
       note,
       score:
-        Array.isArray(note.embedding) && note.embedding.length === embedding.length
+        Array.isArray(note.embedding) &&
+        note.embedding.length === embedding.length
           ? cosineSimilarity(embedding, note.embedding)
           : -1,
     }))

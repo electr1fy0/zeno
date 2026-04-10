@@ -96,7 +96,7 @@
       });
   }
 
-  var app = angular.module("zenoApp", ["ngRoute"]);
+  const app = angular.module("zenoApp", ["ngRoute"]);
 
   app.config([
     "$routeProvider",
@@ -221,7 +221,9 @@
       vm.passwordStrength = getPasswordStrength("");
 
       vm.updatePasswordStrength = function () {
-        vm.passwordStrength = getPasswordStrength((vm.form.password || "").trim());
+        vm.passwordStrength = getPasswordStrength(
+          (vm.form.password || "").trim(),
+        );
       };
 
       vm.register = function () {
@@ -473,7 +475,9 @@
                 $rootScope,
                 readError(
                   xhr,
-                  vm.activeChatId ? "Could not send message." : "Could not start chat.",
+                  vm.activeChatId
+                    ? "Could not send message."
+                    : "Could not start chat.",
                 ),
               );
             });
