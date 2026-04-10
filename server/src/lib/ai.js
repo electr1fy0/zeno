@@ -1,29 +1,23 @@
 import { google } from "@ai-sdk/google";
-import { generateText, stepCountIs, tool } from "ai";
+import { embed, generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
-import {
-  createNote,
-  listNotes,
-  deleteNote,
-  createTask,
-  listTasks,
-  setTaskDoneState,
-  deleteTask,
-} from "../db/memory.js";
+import { createNote, listNotes, searchNotes, deleteNote } from "../db/memory.js";
 
 const model = google(
   process.env.GOOGLE_MODEL ?? "gemini-3.1-flash-lite-preview",
 );
+const embeddingModel = google.embedding(
+  process.env.GOOGLE_EMBEDDING_MODEL ?? "gemini-embedding-001",
+);
 
 const MEMORY_SYSTEM_PROMPT = `
-You are Zeno, a helpful assistant with tools for personal notes and tasks.
+You are Zeno, a helpful assistant with tools for personal notes.
 
 Rules:
-- Use note/task tools only when the user explicitly asks to remember, save, add, list, show, complete, reopen, or delete a note/task.
+- Use note tools only when the user explicitly asks to remember, save, add, list, show, or delete a note.
 - Do not store memories proactively from casual conversation.
-- Prefer notes for memory/fact storage and tasks for action items the user explicitly wants tracked.
+- Use semantic note search when the user asks what you remember about a topic or asks you to recall something specific.
 - If a tool reports ambiguous matches, ask the user to clarify which one they mean.
-- If the user asks to list tasks, present them neatly as checklist-style bullets.
 - If the user asks to list notes, present them neatly as concise bullets.
 - Keep replies clear and concise unless the user asks for more detail.
 `.trim();
@@ -39,6 +33,15 @@ async function getChatTitle(message) {
   return text.trim().replace(/^["']|["']$/g, "") || "New chat";
 }
 
+async function getEmbedding(text) {
+  const { embedding } = await embed({
+    model: embeddingModel,
+    value: text,
+  });
+
+  return embedding;
+}
+
 function buildTools(userId) {
   return {
     create_note: tool({
@@ -48,7 +51,7 @@ function buildTools(userId) {
       }),
       execute: async ({ content }) => ({
         status: "created",
-        note: await createNote(userId, content.trim()),
+        note: await createNote(userId, content.trim(), await getEmbedding(content.trim())),
       }),
     }),
     list_notes: tool({
@@ -57,6 +60,21 @@ function buildTools(userId) {
       execute: async () => ({
         status: "listed",
         notes: await listNotes(userId),
+      }),
+    }),
+    search_notes: tool({
+      description:
+        "Find the saved notes most relevant to a topic or question using semantic similarity.",
+      inputSchema: z.object({
+        query: z
+          .string()
+          .min(1)
+          .describe("The topic, phrase, or question to search notes for."),
+      }),
+      execute: async ({ query }) => ({
+        status: "searched",
+        query,
+        notes: await searchNotes(userId, query.trim(), await getEmbedding(query.trim())),
       }),
     }),
     delete_note: tool({
@@ -68,51 +86,6 @@ function buildTools(userId) {
           .describe("The note id or note text to delete."),
       }),
       execute: async ({ query }) => deleteNote(userId, query),
-    }),
-    create_task: tool({
-      description: "Create a task for the current user.",
-      inputSchema: z.object({
-        title: z.string().min(1).describe("The task title."),
-      }),
-      execute: async ({ title }) => ({
-        status: "created",
-        task: await createTask(userId, title.trim()),
-      }),
-    }),
-    list_tasks: tool({
-      description: "List the current user's tasks.",
-      inputSchema: z.object({}),
-      execute: async () => ({
-        status: "listed",
-        tasks: await listTasks(userId),
-      }),
-    }),
-    complete_task: tool({
-      description: "Mark a task as complete using its id or title.",
-      inputSchema: z.object({
-        query: z
-          .string()
-          .min(1)
-          .describe("The task id or task title to mark complete."),
-      }),
-      execute: async ({ query }) => setTaskDoneState(userId, query, true),
-    }),
-    reopen_task: tool({
-      description: "Mark a task as not done using its id or title.",
-      inputSchema: z.object({
-        query: z.string().min(1).describe("The task id or title to reopen."),
-      }),
-      execute: async ({ query }) => setTaskDoneState(userId, query, false),
-    }),
-    delete_task: tool({
-      description: "Delete a task by id or title.",
-      inputSchema: z.object({
-        query: z
-          .string()
-          .min(1)
-          .describe("The task id or task title to delete."),
-      }),
-      execute: async ({ query }) => deleteTask(userId, query),
     }),
   };
 }
@@ -142,6 +115,15 @@ function formatToolFallback(steps) {
       }
 
       return `Here are your notes:\n${formatList(output.notes, (note) => note.content)}`;
+    case "search_notes":
+      if (!output.notes || output.notes.length === 0) {
+        return "I couldn't find any saved notes related to that.";
+      }
+
+      return `Here’s what I found in your notes:\n${formatList(
+        output.notes,
+        (note) => note.content,
+      )}`;
     case "delete_note":
       if (output.status === "deleted" && output.note) {
         return `Deleted note: ${output.note.content}`;
@@ -150,41 +132,6 @@ function formatToolFallback(steps) {
         return `I found multiple matching notes:\n${formatList(output.matches, (note) => `${note.id}: ${note.content}`)}\nReply with the exact note text or id to delete.`;
       }
       return "I couldn't find a matching note to delete.";
-    case "create_task":
-      return `Added task: ${output.task.title}`;
-    case "list_tasks":
-      if (!output.tasks || output.tasks.length === 0) {
-        return "You don't have any tasks yet.";
-      }
-
-      return `Here are your tasks:\n${formatList(
-        output.tasks,
-        (task) => `[${task.done ? "x" : " "}] ${task.title}`,
-      )}`;
-    case "complete_task":
-      if (output.status === "updated" && output.task) {
-        return `Marked task as done: ${output.task.title}`;
-      }
-      if (output.status === "ambiguous" && output.matches?.length) {
-        return `I found multiple matching tasks:\n${formatList(output.matches, (task) => `${task.id}: ${task.title}`)}\nReply with the exact task title or id to complete.`;
-      }
-      return "I couldn't find a matching task to complete.";
-    case "reopen_task":
-      if (output.status === "updated" && output.task) {
-        return `Reopened task: ${output.task.title}`;
-      }
-      if (output.status === "ambiguous" && output.matches?.length) {
-        return `I found multiple matching tasks:\n${formatList(output.matches, (task) => `${task.id}: ${task.title}`)}\nReply with the exact task title or id to reopen.`;
-      }
-      return "I couldn't find a matching task to reopen.";
-    case "delete_task":
-      if (output.status === "deleted" && output.task) {
-        return `Deleted task: ${output.task.title}`;
-      }
-      if (output.status === "ambiguous" && output.matches?.length) {
-        return `I found multiple matching tasks:\n${formatList(output.matches, (task) => `${task.id}: ${task.title}`)}\nReply with the exact task title or id to delete.`;
-      }
-      return "I couldn't find a matching task to delete.";
     default:
       return "Done.";
   }

@@ -107,41 +107,112 @@
   ]);
 
   app.factory("ApiService", [
-    "$http",
-    function ($http) {
-      function request(method, url, data) {
-        return $http({
-          method: method,
-          url: url,
+    "$rootScope",
+    function ($rootScope) {
+      function applyAsync(callback) {
+        $rootScope.$applyAsync(callback);
+      }
+
+      function normalizeSuccess(data, xhr) {
+        return {
           data: data,
-          withCredentials: true,
+          status: xhr && typeof xhr.status === "number" ? xhr.status : 200,
+        };
+      }
+
+      function normalizeError(xhr) {
+        return {
+          data: xhr && xhr.responseJSON ? xhr.responseJSON : null,
+          status: xhr && typeof xhr.status === "number" ? xhr.status : 0,
+        };
+      }
+
+      function getJson(url) {
+        return new Promise(function (resolve, reject) {
+          $.getJSON(url)
+            .done(function (data, _textStatus, xhr) {
+              applyAsync(function () {
+                resolve(normalizeSuccess(data, xhr));
+              });
+            })
+            .fail(function (xhr) {
+              applyAsync(function () {
+                reject(normalizeError(xhr));
+              });
+            });
+        });
+      }
+
+      function postJson(url, payload, options) {
+        var settings = options || {};
+
+        return new Promise(function (resolve, reject) {
+          $.ajax({
+            method: "POST",
+            url: url,
+            data: payload ? JSON.stringify(payload) : null,
+            contentType: "application/json",
+            dataType: settings.expectJson === false ? undefined : "json",
+          })
+            .done(function (data, _textStatus, xhr) {
+              applyAsync(function () {
+                resolve(normalizeSuccess(data, xhr));
+              });
+            })
+            .fail(function (xhr) {
+              applyAsync(function () {
+                reject(normalizeError(xhr));
+              });
+            });
+        });
+      }
+
+      function deleteRequest(url) {
+        return new Promise(function (resolve, reject) {
+          $.ajax({
+            method: "DELETE",
+            url: url,
+          })
+            .done(function (data, _textStatus, xhr) {
+              applyAsync(function () {
+                resolve(normalizeSuccess(data, xhr));
+              });
+            })
+            .fail(function (xhr) {
+              applyAsync(function () {
+                reject(normalizeError(xhr));
+              });
+            });
         });
       }
 
       return {
         register: function (payload) {
-          return request("POST", "/api/auth/register", payload);
+          return postJson("/api/auth/register", payload);
         },
         login: function (payload) {
-          return request("POST", "/api/auth/login", payload);
+          return postJson("/api/auth/login", payload);
         },
         logout: function () {
-          return request("POST", "/api/auth/logout");
+          return postJson("/api/auth/logout", null, { expectJson: false });
         },
         getCurrentUser: function () {
-          return request("GET", "/api/auth/me");
+          return getJson("/api/auth/me");
         },
         getChats: function () {
-          return request("GET", "/api/chats");
+          return getJson("/api/chats");
         },
         getChat: function (id) {
-          return request("GET", "/api/chats/" + id);
+          return getJson("/api/chats/" + id);
         },
         createChat: function (payload) {
-          return request("POST", "/api/chats", payload);
+          return postJson("/api/chats", payload);
         },
         sendMessage: function (id, payload) {
-          return request("POST", "/api/chats/" + id + "/messages", payload);
+          return postJson("/api/chats/" + id + "/messages", payload);
+        },
+        deleteChat: function (id) {
+          return deleteRequest("/api/chats/" + id);
         },
       };
     },
@@ -323,10 +394,11 @@
     "$location",
     "$routeParams",
     "$timeout",
+    "$window",
     "ApiService",
     "AuthService",
     "FlashService",
-    function ($rootScope, $location, $routeParams, $timeout, ApiService, AuthService, FlashService) {
+    function ($rootScope, $location, $routeParams, $timeout, $window, ApiService, AuthService, FlashService) {
       var vm = this;
       vm.history = [];
       vm.messages = [];
@@ -335,6 +407,29 @@
       vm.searchQuery = "";
       vm.loading = false;
       vm.currentUser = $rootScope.currentUser || null;
+      vm.sidebarOpen = false;
+
+      vm.isMobileSidebar = function () {
+        return $window.innerWidth <= 960;
+      };
+
+      vm.syncSidebarState = function () {
+        if (vm.isMobileSidebar()) {
+          vm.sidebarOpen = false;
+        }
+      };
+
+      vm.toggleSidebar = function () {
+        if (vm.isMobileSidebar()) {
+          vm.sidebarOpen = !vm.sidebarOpen;
+        }
+      };
+
+      vm.closeSidebar = function () {
+        if (vm.isMobileSidebar()) {
+          vm.sidebarOpen = false;
+        }
+      };
 
       vm.scrollToBottom = function () {
         $timeout(function () {
@@ -389,7 +484,45 @@
       };
 
       vm.openChat = function (chatId) {
+        vm.closeSidebar();
         $location.path("/chat/" + chatId);
+      };
+
+      vm.deleteChat = function (chatId, event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+
+        if (!chatId || vm.loading) {
+          return;
+        }
+
+        vm.loading = true;
+        ApiService.deleteChat(chatId)
+          .then(function () {
+            vm.history = vm.history.filter(function (chat) {
+              return chat._id !== chatId;
+            });
+
+            if (vm.activeChatId === chatId) {
+              vm.activeChatId = "";
+              vm.messages = [];
+              vm.draft = "";
+              $location.path("/chat");
+            }
+          })
+          .catch(function (error) {
+            if (error.status === 401) {
+              $location.path("/login");
+              return;
+            }
+
+            FlashService.show(error.data && error.data.error ? error.data.error : "Could not delete chat.");
+          })
+          .finally(function () {
+            vm.loading = false;
+          });
       };
 
       vm.filteredHistory = function () {
@@ -416,6 +549,7 @@
         vm.activeChatId = "";
         vm.messages = [];
         vm.draft = "";
+        vm.closeSidebar();
         $location.path("/chat");
       };
 
@@ -480,9 +614,20 @@
 
       vm.loadHistory();
       vm.loadChat($routeParams.id || "");
+      vm.syncSidebarState();
+
+      angular.element($window).on("resize", function () {
+        $rootScope.$applyAsync(function () {
+          vm.syncSidebarState();
+        });
+      });
 
       $rootScope.$watch("currentUser", function (user) {
         vm.currentUser = user;
+      });
+
+      $rootScope.$on("$destroy", function () {
+        angular.element($window).off("resize");
       });
     },
   ]);

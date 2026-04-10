@@ -1,16 +1,17 @@
 <section class="chat-layout">
-  <aside class="chat-sidebar">
+  <div
+    class="chat-overlay"
+    ng-class="{ 'chat-overlay--visible': vm.sidebarOpen && vm.isMobileSidebar() }"
+    ng-click="vm.closeSidebar()"
+  ></div>
+
+  <aside
+    class="chat-sidebar"
+    ng-class="{ 'chat-sidebar--open': vm.sidebarOpen && vm.isMobileSidebar() }"
+  >
     <div class="sidebar-top">
       <div class="sidebar-head">
         <span class="sidebar-logo-text">Zeno</span>
-        <button
-          type="button"
-          class="sidebar-compose-btn"
-          ng-click="vm.startNewChat()"
-          aria-label="New chat"
-        >
-          <i class="hgi-stroke hgi-pencil-edit-02"></i>
-        </button>
       </div>
     </div>
 
@@ -28,15 +29,27 @@
       </div>
 
       <div class="chat-history" ng-if="vm.history.length">
-        <button
-          type="button"
+        <div
           class="history-item"
           ng-repeat="chat in vm.filteredHistory() track by chat._id"
           ng-class="{ 'history-item--active': chat._id === vm.activeChatId }"
-          ng-click="vm.openChat(chat._id)"
         >
-          <span class="history-title">{{ chat.title || "New chat" }}</span>
-        </button>
+          <button
+            type="button"
+            class="history-item-link"
+            ng-click="vm.openChat(chat._id)"
+          >
+            <span class="history-title">{{ chat.title || "New chat" }}</span>
+          </button>
+          <button
+            type="button"
+            class="history-item-delete"
+            ng-click="vm.deleteChat(chat._id, $event)"
+            aria-label="Delete chat"
+          >
+            <i class="hgi-stroke hgi-delete-02"></i>
+          </button>
+        </div>
       </div>
 
       <div class="sidebar-empty" ng-if="!vm.history.length">
@@ -63,7 +76,34 @@
     </div>
   </aside>
 
-  <section class="chat-main" ng-class="{ 'chat-main--empty': !vm.messages.length }">
+  <section
+    class="chat-main"
+    ng-class="{
+      'chat-main--empty': !vm.messages.length
+    }"
+  >
+    <div class="chat-main-toolbar">
+      <div class="chat-main-toolbar-actions">
+        <button
+          type="button"
+          class="chat-main-toggle"
+          ng-if="vm.isMobileSidebar()"
+          ng-click="vm.toggleSidebar()"
+          aria-label="Toggle sidebar"
+        >
+          <i class="hgi-stroke hgi-menu-11"></i>
+        </button>
+        <button
+          type="button"
+          class="chat-main-compose"
+          ng-click="vm.startNewChat()"
+          aria-label="New chat"
+        >
+          <i class="hgi-stroke hgi-pencil-edit-02"></i>
+        </button>
+      </div>
+    </div>
+
     <div class="chat-scroll" id="chat-scroll">
       <div class="chat-hero" ng-if="!vm.messages.length">
         <h1>What can I help with?</h1>

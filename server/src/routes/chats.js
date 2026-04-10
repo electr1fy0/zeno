@@ -178,4 +178,29 @@ chatRouter.post("/:id/messages", async (req, res) => {
   res.json(toChatResponse(updatedChat));
 });
 
+chatRouter.delete("/:id", async (req, res) => {
+  const userId = requireAuth(req, res);
+  if (!userId) {
+    return;
+  }
+
+  const chatId = parseId(req.params.id);
+  if (!chatId) {
+    res.status(400).json({ error: "Invalid chat id" });
+    return;
+  }
+
+  const result = await getDb().collection("chats").deleteOne({
+    _id: chatId,
+    userId: new ObjectId(userId),
+  });
+
+  if (!result.deletedCount) {
+    res.status(404).json({ error: "Chat not found" });
+    return;
+  }
+
+  res.status(204).end();
+});
+
 export { chatRouter };

@@ -1,4 +1,5 @@
 import { ObjectId } from "mongodb";
+import { cosineSimilarity } from "ai";
 import { getDb } from "./db.js";
 
 function toObjectId(userId) {
@@ -18,22 +19,17 @@ function toNoteSummary(note) {
   };
 }
 
-function toTaskSummary(task) {
-  return {
-    id: task._id.toHexString(),
-    title: task.title,
-    done: Boolean(task.done),
-    createdAt: task.createdAt.toISOString(),
-    updatedAt: task.updatedAt.toISOString(),
-  };
+function toStoredEmbedding(embedding) {
+  return Array.isArray(embedding) ? embedding.map(Number) : null;
 }
 
-async function createNote(userId, content) {
+async function createNote(userId, content, embedding) {
   const db = getDb();
   const now = new Date();
   const result = await db.collection("notes").insertOne({
     userId: toObjectId(userId),
     content,
+    embedding: toStoredEmbedding(embedding),
     createdAt: now,
     updatedAt: now,
   });
@@ -52,29 +48,37 @@ async function listNotes(userId) {
   return notes.map(toNoteSummary);
 }
 
-async function createTask(userId, title) {
-  const db = getDb();
-  const now = new Date();
-  const result = await db.collection("tasks").insertOne({
-    userId: toObjectId(userId),
-    title,
-    done: false,
-    createdAt: now,
-    updatedAt: now,
-  });
+async function searchNotes(userId, query, queryEmbedding) {
+  const embedding = toStoredEmbedding(queryEmbedding);
+  void query;
 
-  const task = await db.collection("tasks").findOne({ _id: result.insertedId });
-  return toTaskSummary(task);
-}
+  if (!embedding || embedding.length === 0) {
+    return [];
+  }
 
-async function listTasks(userId) {
-  const tasks = await getDb()
-    .collection("tasks")
-    .find({ userId: toObjectId(userId) })
-    .sort({ done: 1, updatedAt: -1 })
+  const notes = await getDb()
+    .collection("notes")
+    .find({
+      userId: toObjectId(userId),
+      embedding: { $type: "array" },
+    })
     .toArray();
 
-  return tasks.map(toTaskSummary);
+  return notes
+    .map((note) => ({
+      note,
+      score:
+        Array.isArray(note.embedding) && note.embedding.length === embedding.length
+          ? cosineSimilarity(embedding, note.embedding)
+          : -1,
+    }))
+    .filter((entry) => Number.isFinite(entry.score) && entry.score > 0.15)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 5)
+    .map((entry) => ({
+      ...toNoteSummary(entry.note),
+      score: Number(entry.score.toFixed(3)),
+    }));
 }
 
 async function findMatchingDocument(collectionName, userId, fieldName, query) {
@@ -154,57 +158,4 @@ async function deleteNote(userId, query) {
   };
 }
 
-async function setTaskDoneState(userId, query, done) {
-  const match = await findMatchingDocument("tasks", userId, "title", query);
-
-  if (match.status !== "matched") {
-    return {
-      status: match.status,
-      matches: (match.matches || []).map(toTaskSummary),
-    };
-  }
-
-  const updatedTask = await getDb().collection("tasks").findOneAndUpdate(
-    { _id: match.document._id },
-    {
-      $set: {
-        done,
-        updatedAt: new Date(),
-      },
-    },
-    { returnDocument: "after" },
-  );
-
-  return {
-    status: "updated",
-    task: toTaskSummary(updatedTask),
-  };
-}
-
-async function deleteTask(userId, query) {
-  const match = await findMatchingDocument("tasks", userId, "title", query);
-
-  if (match.status !== "matched") {
-    return {
-      status: match.status,
-      matches: (match.matches || []).map(toTaskSummary),
-    };
-  }
-
-  await getDb().collection("tasks").deleteOne({ _id: match.document._id });
-
-  return {
-    status: "deleted",
-    task: toTaskSummary(match.document),
-  };
-}
-
-export {
-  createNote,
-  listNotes,
-  deleteNote,
-  createTask,
-  listTasks,
-  setTaskDoneState,
-  deleteTask,
-};
+export { createNote, listNotes, searchNotes, deleteNote };
