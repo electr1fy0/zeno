@@ -1,17 +1,13 @@
 import { MongoClient } from "mongodb";
+import { config } from "../config.js";
 
 let client = null;
 let db = null;
 
 async function connectDb() {
-  const uri =
-    process.env.MONGODB_URI ??
-    "mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000";
-  const dbName = process.env.MONGODB_DB_NAME ?? "zeno";
-
-  client = new MongoClient(uri);
+  client = new MongoClient(config.mongodb.uri);
   await client.connect();
-  db = client.db(dbName);
+  db = client.db(config.mongodb.dbName);
 }
 
 function getDb() {

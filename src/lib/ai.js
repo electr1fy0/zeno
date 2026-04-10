@@ -2,13 +2,19 @@ import { google } from "@ai-sdk/google";
 import { embed, generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 import { createNote, listNotes, searchNotes, deleteNote } from "../db/memory.js";
+import { config } from "../config.js";
 
-const model = google(
-  process.env.GOOGLE_MODEL ?? "gemini-3.1-flash-lite-preview",
-);
-const embeddingModel = google.embedding(
-  process.env.GOOGLE_EMBEDDING_MODEL ?? "gemini-embedding-001",
-);
+function getTextModel() {
+  return google(config.ai.model, {
+    apiKey: config.ai.googleApiKey,
+  });
+}
+
+function getEmbeddingModel() {
+  return google.embedding(config.ai.embeddingModel, {
+    apiKey: config.ai.googleApiKey,
+  });
+}
 
 const MEMORY_SYSTEM_PROMPT = `
 You are Zeno, a helpful assistant with tools for personal notes.
@@ -24,7 +30,7 @@ Rules:
 
 async function getChatTitle(message) {
   const { text } = await generateText({
-    model,
+    model: getTextModel(),
     prompt:
       "Return only a short chat title under six words for this user message: " +
       message,
@@ -35,7 +41,7 @@ async function getChatTitle(message) {
 
 async function getEmbedding(text) {
   const { embedding } = await embed({
-    model: embeddingModel,
+    model: getEmbeddingModel(),
     value: text,
   });
 
@@ -139,7 +145,7 @@ function formatToolFallback(steps) {
 
 async function getAssistantReply(messages, userId) {
   const result = await generateText({
-    model,
+    model: getTextModel(),
     system: MEMORY_SYSTEM_PROMPT,
     messages,
     tools: buildTools(userId),

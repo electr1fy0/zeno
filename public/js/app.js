@@ -370,7 +370,10 @@
                 return;
               }
 
-              showFlash($rootScope, readAjaxError(xhr, "Could not delete chat."));
+              showFlash(
+                $rootScope,
+                readAjaxError(xhr, "Could not delete chat."),
+              );
             });
           })
           .always(function () {
@@ -457,7 +460,10 @@
                   return;
                 }
 
-                showFlash($rootScope, readAjaxError(xhr, "Could not start chat."));
+                showFlash(
+                  $rootScope,
+                  readAjaxError(xhr, "Could not start chat."),
+                );
               });
             })
             .always(function () {
@@ -492,7 +498,10 @@
                 return;
               }
 
-              showFlash($rootScope, readAjaxError(xhr, "Could not send message."));
+              showFlash(
+                $rootScope,
+                readAjaxError(xhr, "Could not send message."),
+              );
             });
           })
           .always(function () {

@@ -36,6 +36,14 @@ function toChatResponse(chat) {
   };
 }
 
+function isInvalidAiCredentialError(error) {
+  return (
+    error?.name === "AI_APICallError" &&
+    typeof error?.message === "string" &&
+    error.message.toLowerCase().includes("api key not valid")
+  );
+}
+
 chatRouter.get("/", async (req, res) => {
   const userId = requireAuth(req, res);
   if (!userId) {
@@ -96,24 +104,36 @@ chatRouter.post("/", async (req, res) => {
     return;
   }
 
-  const now = new Date();
-  const userMessage = { role: "user", content: message };
-  const assistantMessage = {
-    role: "assistant",
-    content: await getAssistantReply([userMessage], userId),
-  };
-  const title = await getChatTitle(message);
+  try {
+    const now = new Date();
+    const userMessage = { role: "user", content: message };
+    const assistantMessage = {
+      role: "assistant",
+      content: await getAssistantReply([userMessage], userId),
+    };
+    const title = await getChatTitle(message);
 
-  const result = await getDb().collection("chats").insertOne({
-    userId: new ObjectId(userId),
-    title,
-    messages: [userMessage, assistantMessage],
-    createdAt: now,
-    updatedAt: now,
-  });
+    const result = await getDb().collection("chats").insertOne({
+      userId: new ObjectId(userId),
+      title,
+      messages: [userMessage, assistantMessage],
+      createdAt: now,
+      updatedAt: now,
+    });
 
-  const chat = await getDb().collection("chats").findOne({ _id: result.insertedId });
-  res.status(201).json(toChatResponse(chat));
+    const chat = await getDb().collection("chats").findOne({ _id: result.insertedId });
+    res.status(201).json(toChatResponse(chat));
+  } catch (error) {
+    if (isInvalidAiCredentialError(error)) {
+      res.status(502).json({
+        error: "Google AI API key is invalid. Update GOOGLE_GENERATIVE_AI_API_KEY in .env and restart the server.",
+      });
+      return;
+    }
+
+    console.error("Failed to create chat", error);
+    res.status(500).json({ error: "Could not start chat." });
+  }
 });
 
 chatRouter.post("/:id/messages", async (req, res) => {
@@ -145,37 +165,49 @@ chatRouter.post("/:id/messages", async (req, res) => {
     return;
   }
 
-  const userMessage = { role: "user", content: message };
-  const assistantMessage = {
-    role: "assistant",
-    content: await getAssistantReply([...(chat.messages || []), userMessage], userId),
-  };
+  try {
+    const userMessage = { role: "user", content: message };
+    const assistantMessage = {
+      role: "assistant",
+      content: await getAssistantReply([...(chat.messages || []), userMessage], userId),
+    };
 
-  const setFields = {
-    updatedAt: new Date(),
-  };
+    const setFields = {
+      updatedAt: new Date(),
+    };
 
-  if (!chat.title || chat.title === "New chat") {
-    setFields.title = await getChatTitle(message);
-  }
+    if (!chat.title || chat.title === "New chat") {
+      setFields.title = await getChatTitle(message);
+    }
 
-  const updatedChat = await db.collection("chats").findOneAndUpdate(
-    {
-      _id: chatId,
-      userId: new ObjectId(userId),
-    },
-    {
-      $set: setFields,
-      $push: {
-        messages: {
-          $each: [userMessage, assistantMessage],
+    const updatedChat = await db.collection("chats").findOneAndUpdate(
+      {
+        _id: chatId,
+        userId: new ObjectId(userId),
+      },
+      {
+        $set: setFields,
+        $push: {
+          messages: {
+            $each: [userMessage, assistantMessage],
+          },
         },
       },
-    },
-    { returnDocument: "after" },
-  );
+      { returnDocument: "after" },
+    );
 
-  res.json(toChatResponse(updatedChat));
+    res.json(toChatResponse(updatedChat));
+  } catch (error) {
+    if (isInvalidAiCredentialError(error)) {
+      res.status(502).json({
+        error: "Google AI API key is invalid. Update GOOGLE_GENERATIVE_AI_API_KEY in .env and restart the server.",
+      });
+      return;
+    }
+
+    console.error("Failed to append chat message", error);
+    res.status(500).json({ error: "Could not send message." });
+  }
 });
 
 chatRouter.delete("/:id", async (req, res) => {

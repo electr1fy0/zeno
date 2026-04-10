@@ -5,9 +5,9 @@
   "type": "module",
   "description": "Simple Express and AngularJS CRUD app with session auth",
   "scripts": {
-    "dev": "node --watch server/src/index.js",
-    "build": "node -e \"import('./server/src/index.js')\"",
-    "start": "node server/src/index.js"
+    "dev": "node --watch src/index.js",
+    "build": "node -e \"import('./src/app.js')\"",
+    "start": "node src/index.js"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.43",
