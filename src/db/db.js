@@ -8,6 +8,7 @@ async function connectDb() {
   client = new MongoClient(config.mongodb.uri);
   await client.connect();
   db = client.db(config.mongodb.dbName);
+  console.log(db);
 }
 
 function getDb() {
