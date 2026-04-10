@@ -132,11 +132,10 @@
       <form class="composer-shell" ng-submit="vm.sendMessage()" novalidate>
         <textarea
           class="composer-input"
-          rows="1"
+          rows="2"
           placeholder="Ask anything"
           ng-model="vm.draft"
           ng-disabled="vm.loading"
-          zeno-autosize
           ng-keydown="vm.handleComposerKeydown($event)"
         ></textarea>
         <button

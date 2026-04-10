@@ -34,6 +34,22 @@
     return isValid;
   }
 
+  function showFlash($rootScope, message) {
+    $rootScope.flashMessage = message;
+    window.clearTimeout($rootScope.flashTimer);
+    $rootScope.flashTimer = window.setTimeout(function () {
+      $rootScope.$applyAsync(function () {
+        $rootScope.flashMessage = "";
+      });
+    }, 3000);
+  }
+
+  function readAjaxError(xhr, fallbackMessage) {
+    return xhr && xhr.responseJSON && xhr.responseJSON.error
+      ? xhr.responseJSON.error
+      : fallbackMessage;
+  }
+
   $(document).on("submit", ".auth-form", function (event) {
     if (!validateAuthForm($(this))) {
       event.preventDefault();
@@ -89,226 +105,33 @@
     },
   ]);
 
-  app.factory("FlashService", [
-    "$rootScope",
-    function ($rootScope) {
-      return {
-        show: function (message) {
-          $rootScope.flashMessage = message;
-          window.clearTimeout($rootScope.flashTimer);
-          $rootScope.flashTimer = window.setTimeout(function () {
-            $rootScope.$applyAsync(function () {
-              $rootScope.flashMessage = "";
-            });
-          }, 3000);
-        },
-      };
-    },
-  ]);
-
-  app.factory("ApiService", [
-    "$rootScope",
-    function ($rootScope) {
-      function applyAsync(callback) {
-        $rootScope.$applyAsync(callback);
-      }
-
-      function normalizeSuccess(data, xhr) {
-        return {
-          data: data,
-          status: xhr && typeof xhr.status === "number" ? xhr.status : 200,
-        };
-      }
-
-      function normalizeError(xhr) {
-        return {
-          data: xhr && xhr.responseJSON ? xhr.responseJSON : null,
-          status: xhr && typeof xhr.status === "number" ? xhr.status : 0,
-        };
-      }
-
-      function getJson(url) {
-        return new Promise(function (resolve, reject) {
-          $.getJSON(url)
-            .done(function (data, _textStatus, xhr) {
-              applyAsync(function () {
-                resolve(normalizeSuccess(data, xhr));
-              });
-            })
-            .fail(function (xhr) {
-              applyAsync(function () {
-                reject(normalizeError(xhr));
-              });
-            });
-        });
-      }
-
-      function postJson(url, payload, options) {
-        var settings = options || {};
-
-        return new Promise(function (resolve, reject) {
-          $.ajax({
-            method: "POST",
-            url: url,
-            data: payload ? JSON.stringify(payload) : null,
-            contentType: "application/json",
-            dataType: settings.expectJson === false ? undefined : "json",
-          })
-            .done(function (data, _textStatus, xhr) {
-              applyAsync(function () {
-                resolve(normalizeSuccess(data, xhr));
-              });
-            })
-            .fail(function (xhr) {
-              applyAsync(function () {
-                reject(normalizeError(xhr));
-              });
-            });
-        });
-      }
-
-      function deleteRequest(url) {
-        return new Promise(function (resolve, reject) {
-          $.ajax({
-            method: "DELETE",
-            url: url,
-          })
-            .done(function (data, _textStatus, xhr) {
-              applyAsync(function () {
-                resolve(normalizeSuccess(data, xhr));
-              });
-            })
-            .fail(function (xhr) {
-              applyAsync(function () {
-                reject(normalizeError(xhr));
-              });
-            });
-        });
-      }
-
-      return {
-        register: function (payload) {
-          return postJson("/api/auth/register", payload);
-        },
-        login: function (payload) {
-          return postJson("/api/auth/login", payload);
-        },
-        logout: function () {
-          return postJson("/api/auth/logout", null, { expectJson: false });
-        },
-        getCurrentUser: function () {
-          return getJson("/api/auth/me");
-        },
-        getChats: function () {
-          return getJson("/api/chats");
-        },
-        getChat: function (id) {
-          return getJson("/api/chats/" + id);
-        },
-        createChat: function (payload) {
-          return postJson("/api/chats", payload);
-        },
-        sendMessage: function (id, payload) {
-          return postJson("/api/chats/" + id + "/messages", payload);
-        },
-        deleteChat: function (id) {
-          return deleteRequest("/api/chats/" + id);
-        },
-      };
-    },
-  ]);
-
-  app.factory("AuthService", [
-    "ApiService",
-    "$location",
-    function (ApiService, $location) {
-      var currentUser = null;
-
-      return {
-        refreshUser: function () {
-          return ApiService.getCurrentUser()
-            .then(function (response) {
-              currentUser = response.data.user;
-              return currentUser;
-            })
-            .catch(function () {
-              currentUser = null;
-              return null;
-            });
-        },
-        setUser: function (user) {
-          currentUser = user;
-        },
-        redirectIfNeeded: function (path) {
-          var publicPaths = ["/login", "/register"];
-          return this.refreshUser().then(function (user) {
-            if (!user && publicPaths.indexOf(path) === -1) {
-              $location.path("/login");
-              return null;
-            }
-
-            if (user && publicPaths.indexOf(path) !== -1) {
-              $location.path("/chat");
-            }
-
-            return user;
-          });
-        },
-      };
-    },
-  ]);
-
   app.run([
     "$rootScope",
-    "$location",
-    "AuthService",
-    function ($rootScope, $location, AuthService) {
+    function ($rootScope) {
       $rootScope.flashMessage = "";
-
-      $rootScope.$on("$routeChangeStart", function (_event, next) {
-        var path = next && next.$$route ? next.$$route.originalPath : $location.path();
-        AuthService.redirectIfNeeded(path).then(function (user) {
-          $rootScope.currentUser = user;
-        });
-      });
-    },
-  ]);
-
-  app.directive("zenoAutosize", [
-    function () {
-      return {
-        restrict: "A",
-        link: function (_scope, element) {
-          function resize() {
-            element[0].style.height = "auto";
-            element[0].style.height = Math.min(element[0].scrollHeight, 240) + "px";
-          }
-
-          element.on("input", resize);
-          setTimeout(resize, 0);
-        },
-      };
+      $rootScope.currentUser = null;
     },
   ]);
 
   app.controller("AppController", [
     "$rootScope",
     "$location",
-    "ApiService",
-    "AuthService",
-    "FlashService",
-    function ($rootScope, $location, ApiService, AuthService, FlashService) {
+    function ($rootScope, $location) {
       var vm = this;
       vm.currentUser = null;
       vm.flashMessage = "";
       vm.showHeader = true;
 
       vm.logout = function () {
-        ApiService.logout().finally(function () {
-          AuthService.setUser(null);
-          $rootScope.currentUser = null;
-          vm.currentUser = null;
-          $location.path("/login");
+        $.ajax({
+          method: "POST",
+          url: "/api/auth/logout",
+        }).always(function () {
+          $rootScope.$applyAsync(function () {
+            $rootScope.currentUser = null;
+            vm.currentUser = null;
+            $location.path("/login");
+          });
         });
       };
 
@@ -334,27 +157,35 @@
   app.controller("LoginController", [
     "$location",
     "$rootScope",
-    "ApiService",
-    "AuthService",
-    "FlashService",
-    function ($location, $rootScope, ApiService, AuthService, FlashService) {
+    function ($location, $rootScope) {
       var vm = this;
       vm.form = { username: "", password: "" };
       vm.loading = false;
 
       vm.login = function () {
         vm.loading = true;
-        ApiService.login(vm.form)
-          .then(function (response) {
-            AuthService.setUser(response.data.user);
-            $rootScope.currentUser = response.data.user;
-            $location.path("/chat");
+        $.ajax({
+          method: "POST",
+          url: "/api/auth/login",
+          data: JSON.stringify(vm.form),
+          contentType: "application/json",
+          dataType: "json",
+        })
+          .done(function (response) {
+            $rootScope.$applyAsync(function () {
+              $rootScope.currentUser = response.user;
+              $location.path("/chat");
+            });
           })
-          .catch(function (error) {
-            FlashService.show(error.data && error.data.error ? error.data.error : "Login failed.");
+          .fail(function (xhr) {
+            $rootScope.$applyAsync(function () {
+              showFlash($rootScope, readAjaxError(xhr, "Login failed."));
+            });
           })
-          .finally(function () {
-            vm.loading = false;
+          .always(function () {
+            $rootScope.$applyAsync(function () {
+              vm.loading = false;
+            });
           });
       };
     },
@@ -363,27 +194,35 @@
   app.controller("RegisterController", [
     "$location",
     "$rootScope",
-    "ApiService",
-    "AuthService",
-    "FlashService",
-    function ($location, $rootScope, ApiService, AuthService, FlashService) {
+    function ($location, $rootScope) {
       var vm = this;
       vm.form = { username: "", password: "" };
       vm.loading = false;
 
       vm.register = function () {
         vm.loading = true;
-        ApiService.register(vm.form)
-          .then(function (response) {
-            AuthService.setUser(response.data.user);
-            $rootScope.currentUser = response.data.user;
-            $location.path("/chat");
+        $.ajax({
+          method: "POST",
+          url: "/api/auth/register",
+          data: JSON.stringify(vm.form),
+          contentType: "application/json",
+          dataType: "json",
+        })
+          .done(function (response) {
+            $rootScope.$applyAsync(function () {
+              $rootScope.currentUser = response.user;
+              $location.path("/chat");
+            });
           })
-          .catch(function (error) {
-            FlashService.show(error.data && error.data.error ? error.data.error : "Registration failed.");
+          .fail(function (xhr) {
+            $rootScope.$applyAsync(function () {
+              showFlash($rootScope, readAjaxError(xhr, "Registration failed."));
+            });
           })
-          .finally(function () {
-            vm.loading = false;
+          .always(function () {
+            $rootScope.$applyAsync(function () {
+              vm.loading = false;
+            });
           });
       };
     },
@@ -395,10 +234,7 @@
     "$routeParams",
     "$timeout",
     "$window",
-    "ApiService",
-    "AuthService",
-    "FlashService",
-    function ($rootScope, $location, $routeParams, $timeout, $window, ApiService, AuthService, FlashService) {
+    function ($rootScope, $location, $routeParams, $timeout, $window) {
       var vm = this;
       vm.history = [];
       vm.messages = [];
@@ -441,17 +277,21 @@
       };
 
       vm.loadHistory = function () {
-        return ApiService.getChats()
-          .then(function (response) {
-            vm.history = response.data;
+        return $.getJSON("/api/chats")
+          .done(function (history) {
+            $rootScope.$applyAsync(function () {
+              vm.history = history;
+            });
           })
-          .catch(function (error) {
-            if (error.status === 401) {
-              $location.path("/login");
-              return;
-            }
+          .fail(function (xhr) {
+            $rootScope.$applyAsync(function () {
+              if (xhr.status === 401) {
+                $location.path("/login");
+                return;
+              }
 
-            FlashService.show("Could not load chats.");
+              showFlash($rootScope, "Could not load chats.");
+            });
           });
       };
 
@@ -463,23 +303,29 @@
         }
 
         vm.loading = true;
-        return ApiService.getChat(chatId)
-          .then(function (response) {
-            vm.activeChatId = response.data._id;
-            vm.messages = response.data.messages || [];
-            vm.scrollToBottom();
+        return $.getJSON("/api/chats/" + chatId)
+          .done(function (chat) {
+            $rootScope.$applyAsync(function () {
+              vm.activeChatId = chat._id;
+              vm.messages = chat.messages || [];
+              vm.scrollToBottom();
+            });
           })
-          .catch(function (error) {
-            if (error.status === 401) {
-              $location.path("/login");
-              return;
-            }
+          .fail(function (xhr) {
+            $rootScope.$applyAsync(function () {
+              if (xhr.status === 401) {
+                $location.path("/login");
+                return;
+              }
 
-            FlashService.show(error.data && error.data.error ? error.data.error : "Could not load chat.");
-            $location.path("/chat");
+              showFlash($rootScope, readAjaxError(xhr, "Could not load chat."));
+              $location.path("/chat");
+            });
           })
-          .finally(function () {
-            vm.loading = false;
+          .always(function () {
+            $rootScope.$applyAsync(function () {
+              vm.loading = false;
+            });
           });
       };
 
@@ -499,29 +345,38 @@
         }
 
         vm.loading = true;
-        ApiService.deleteChat(chatId)
-          .then(function () {
-            vm.history = vm.history.filter(function (chat) {
-              return chat._id !== chatId;
+        $.ajax({
+          method: "DELETE",
+          url: "/api/chats/" + chatId,
+        })
+          .done(function () {
+            $rootScope.$applyAsync(function () {
+              vm.history = vm.history.filter(function (chat) {
+                return chat._id !== chatId;
+              });
+
+              if (vm.activeChatId === chatId) {
+                vm.activeChatId = "";
+                vm.messages = [];
+                vm.draft = "";
+                $location.path("/chat");
+              }
             });
-
-            if (vm.activeChatId === chatId) {
-              vm.activeChatId = "";
-              vm.messages = [];
-              vm.draft = "";
-              $location.path("/chat");
-            }
           })
-          .catch(function (error) {
-            if (error.status === 401) {
-              $location.path("/login");
-              return;
-            }
+          .fail(function (xhr) {
+            $rootScope.$applyAsync(function () {
+              if (xhr.status === 401) {
+                $location.path("/login");
+                return;
+              }
 
-            FlashService.show(error.data && error.data.error ? error.data.error : "Could not delete chat.");
+              showFlash($rootScope, readAjaxError(xhr, "Could not delete chat."));
+            });
           })
-          .finally(function () {
-            vm.loading = false;
+          .always(function () {
+            $rootScope.$applyAsync(function () {
+              vm.loading = false;
+            });
           });
       };
 
@@ -537,11 +392,15 @@
       };
 
       vm.logout = function () {
-        ApiService.logout().finally(function () {
-          AuthService.setUser(null);
-          $rootScope.currentUser = null;
-          vm.currentUser = null;
-          $location.path("/login");
+        $.ajax({
+          method: "POST",
+          url: "/api/auth/logout",
+        }).always(function () {
+          $rootScope.$applyAsync(function () {
+            $rootScope.currentUser = null;
+            vm.currentUser = null;
+            $location.path("/login");
+          });
         });
       };
 
@@ -572,20 +431,39 @@
         if (!vm.activeChatId) {
           vm.messages = [{ role: "user", content: text }];
           vm.scrollToBottom();
-          ApiService.createChat({ message: text })
-            .then(function (response) {
-              vm.activeChatId = response.data._id;
-              vm.messages = response.data.messages || [];
-              vm.loadHistory();
-              $location.path("/chat/" + response.data._id);
-              vm.scrollToBottom();
+
+          $.ajax({
+            method: "POST",
+            url: "/api/chats",
+            data: JSON.stringify({ message: text }),
+            contentType: "application/json",
+            dataType: "json",
+          })
+            .done(function (chat) {
+              $rootScope.$applyAsync(function () {
+                vm.activeChatId = chat._id;
+                vm.messages = chat.messages || [];
+                vm.loadHistory();
+                $location.path("/chat/" + chat._id);
+                vm.scrollToBottom();
+              });
             })
-            .catch(function (error) {
-              vm.messages = [];
-              FlashService.show(error.data && error.data.error ? error.data.error : "Could not start chat.");
+            .fail(function (xhr) {
+              $rootScope.$applyAsync(function () {
+                vm.messages = [];
+
+                if (xhr.status === 401) {
+                  $location.path("/login");
+                  return;
+                }
+
+                showFlash($rootScope, readAjaxError(xhr, "Could not start chat."));
+              });
             })
-            .finally(function () {
-              vm.loading = false;
+            .always(function () {
+              $rootScope.$applyAsync(function () {
+                vm.loading = false;
+              });
             });
           return;
         }
@@ -593,24 +471,51 @@
         vm.messages = vm.messages.concat([{ role: "user", content: text }]);
         vm.scrollToBottom();
 
-        ApiService.sendMessage(vm.activeChatId, { message: text })
-          .then(function (response) {
-            vm.messages = response.data.messages || [];
-            vm.loadHistory();
-            vm.scrollToBottom();
+        $.ajax({
+          method: "POST",
+          url: "/api/chats/" + vm.activeChatId + "/messages",
+          data: JSON.stringify({ message: text }),
+          contentType: "application/json",
+          dataType: "json",
+        })
+          .done(function (chat) {
+            $rootScope.$applyAsync(function () {
+              vm.messages = chat.messages || [];
+              vm.loadHistory();
+              vm.scrollToBottom();
+            });
           })
-          .catch(function (error) {
-            if (error.status === 401) {
-              $location.path("/login");
-              return;
-            }
+          .fail(function (xhr) {
+            $rootScope.$applyAsync(function () {
+              if (xhr.status === 401) {
+                $location.path("/login");
+                return;
+              }
 
-            FlashService.show(error.data && error.data.error ? error.data.error : "Could not send message.");
+              showFlash($rootScope, readAjaxError(xhr, "Could not send message."));
+            });
           })
-          .finally(function () {
-            vm.loading = false;
+          .always(function () {
+            $rootScope.$applyAsync(function () {
+              vm.loading = false;
+            });
           });
       };
+
+      $.getJSON("/api/auth/me")
+        .done(function (response) {
+          $rootScope.$applyAsync(function () {
+            $rootScope.currentUser = response.user;
+            vm.currentUser = response.user;
+          });
+        })
+        .fail(function (xhr) {
+          $rootScope.$applyAsync(function () {
+            if (xhr.status === 401) {
+              $location.path("/login");
+            }
+          });
+        });
 
       vm.loadHistory();
       vm.loadChat($routeParams.id || "");
