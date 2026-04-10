@@ -28,17 +28,6 @@ Rules:
 - Keep replies clear and concise unless the user asks for more detail.
 `.trim();
 
-async function getChatTitle(message) {
-  const { text } = await generateText({
-    model: getTextModel(),
-    prompt:
-      "Return only a short chat title under six words for this user message: " +
-      message,
-  });
-
-  return text.trim().replace(/^["']|["']$/g, "") || "New chat";
-}
-
 async function getEmbedding(text) {
   const { embedding } = await embed({
     model: getEmbeddingModel(),
@@ -160,4 +149,4 @@ async function getAssistantReply(messages, userId) {
   return formatToolFallback(result.steps);
 }
 
-export { getAssistantReply, getChatTitle };
+export { getAssistantReply };

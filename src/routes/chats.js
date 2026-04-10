@@ -1,7 +1,7 @@
 import express from "express";
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/db.js";
-import { getAssistantReply, getChatTitle } from "../lib/ai.js";
+import { getAssistantReply } from "../lib/ai.js";
 
 const chatRouter = express.Router();
 
@@ -23,10 +23,15 @@ function readMessage(body) {
   return message || null;
 }
 
+function buildChatTitle(message) {
+  const title = message.trim().replace(/\s+/g, " ");
+  return title.length > 48 ? title.slice(0, 48).trimEnd() + "..." : title;
+}
+
 function toChatResponse(chat) {
   return {
     _id: chat._id.toHexString(),
-    title: chat.title || "New chat",
+    title: chat.title,
     createdAt: chat.createdAt.toISOString(),
     updatedAt: chat.updatedAt.toISOString(),
     messages: (chat.messages || []).map((message) => ({
@@ -60,7 +65,7 @@ chatRouter.get("/", async (req, res) => {
   res.json(
     chats.map((chat) => ({
       _id: chat._id.toHexString(),
-      title: chat.title || "New chat",
+      title: chat.title,
       createdAt: chat.createdAt.toISOString(),
       updatedAt: chat.updatedAt.toISOString(),
     })),
@@ -111,7 +116,7 @@ chatRouter.post("/", async (req, res) => {
       role: "assistant",
       content: await getAssistantReply([userMessage], userId),
     };
-    const title = await getChatTitle(message);
+    const title = buildChatTitle(message);
 
     const result = await getDb().collection("chats").insertOne({
       userId: new ObjectId(userId),
@@ -176,8 +181,8 @@ chatRouter.post("/:id/messages", async (req, res) => {
       updatedAt: new Date(),
     };
 
-    if (!chat.title || chat.title === "New chat") {
-      setFields.title = await getChatTitle(message);
+    if (!chat.title) {
+      setFields.title = buildChatTitle(message);
     }
 
     const updatedChat = await db.collection("chats").findOneAndUpdate(

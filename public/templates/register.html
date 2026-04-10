@@ -31,7 +31,7 @@
             <h2>Create your workspace</h2>
           </div>
 
-          <form class="auth-form" data-auth-mode="register" ng-submit="vm.register()" novalidate>
+          <form class="auth-form" data-auth-mode="register" ng-submit="vm.register()">
             <div class="mb-3">
               <label for="register-username" class="form-label">Username</label>
               <input
@@ -40,8 +40,8 @@
                 class="form-control"
                 ng-model="vm.form.username"
                 required
+                minlength="3"
               />
-              <div class="invalid-feedback">Enter a username with at least 3 characters.</div>
             </div>
 
             <div class="mb-4">
@@ -51,15 +51,43 @@
                 type="password"
                 class="form-control"
                 ng-model="vm.form.password"
+                ng-change="vm.updatePasswordStrength()"
                 required
+                minlength="8"
               />
-              <div class="invalid-feedback">Enter a password with at least 4 characters.</div>
+              <div class="password-strength" ng-if="vm.form.password">
+                <div class="password-strength-row">
+                  <span>Password strength</span>
+                  <span
+                    class="password-strength-badge"
+                    ng-class="'password-strength-badge--' + vm.passwordStrength.tone"
+                  >
+                    {{ vm.passwordStrength.label }}
+                  </span>
+                </div>
+                <ul class="password-checklist">
+                  <li ng-class="{ 'password-checklist__item--done': vm.passwordStrength.checks.length }">
+                    At least 8 characters
+                  </li>
+                  <li ng-class="{ 'password-checklist__item--done': vm.passwordStrength.checks.upper }">
+                    One uppercase letter
+                  </li>
+                  <li ng-class="{ 'password-checklist__item--done': vm.passwordStrength.checks.lower }">
+                    One lowercase letter
+                  </li>
+                  <li ng-class="{ 'password-checklist__item--done': vm.passwordStrength.checks.number }">
+                    One number
+                  </li>
+                </ul>
+              </div>
             </div>
 
-            <div class="auth-form-error d-none"></div>
-
             <div class="d-flex flex-column gap-3">
-              <button type="submit" class="btn btn-primary btn-lg auth-submit" ng-disabled="vm.loading">
+              <button
+                type="submit"
+                class="btn btn-primary btn-lg auth-submit"
+                ng-disabled="vm.loading || !vm.passwordStrength.isValid"
+              >
                 <i class="hgi-stroke hgi-user-add-02 me-2"></i>
                 {{ vm.loading ? "Creating..." : "Register" }}
               </button>

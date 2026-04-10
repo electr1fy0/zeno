@@ -1,39 +1,6 @@
 (function () {
   "use strict";
 
-  function validateAuthForm($form) {
-    var $username = $form.find('input[type="text"]');
-    var $password = $form.find('input[type="password"]');
-    var $error = $form.find(".auth-form-error");
-    var username = ($username.val() || "").trim();
-    var password = ($password.val() || "").trim();
-    var isValid = true;
-
-    $error.addClass("d-none").text("");
-
-    if (username.length < 3) {
-      $username.addClass("is-invalid");
-      isValid = false;
-    } else {
-      $username.removeClass("is-invalid");
-    }
-
-    if (password.length < 4) {
-      $password.addClass("is-invalid");
-      isValid = false;
-    } else {
-      $password.removeClass("is-invalid");
-    }
-
-    if (!isValid) {
-      $error
-        .removeClass("d-none")
-        .text("Please fix the highlighted fields before continuing.");
-    }
-
-    return isValid;
-  }
-
   function showFlash($rootScope, message) {
     $rootScope.flashMessage = message;
     window.clearTimeout($rootScope.flashTimer);
@@ -44,28 +11,90 @@
     }, 3000);
   }
 
-  function readAjaxError(xhr, fallbackMessage) {
-    return xhr && xhr.responseJSON && xhr.responseJSON.error
-      ? xhr.responseJSON.error
-      : fallbackMessage;
+  function api(method, url, data) {
+    return $.ajax({
+      method: method,
+      url: url,
+      data: data ? JSON.stringify(data) : undefined,
+      contentType: data ? "application/json" : undefined,
+      dataType: "json",
+    });
   }
 
-  $(document).on("submit", ".auth-form", function (event) {
-    if (!validateAuthForm($(this))) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }
-  });
+  function readError(xhr, fallback) {
+    return xhr && xhr.responseJSON && xhr.responseJSON.error
+      ? xhr.responseJSON.error
+      : fallback;
+  }
 
-  $(document).on("input", ".auth-form input", function () {
-    var $input = $(this);
-    var $form = $input.closest(".auth-form");
-    $input.removeClass("is-invalid");
-
-    if ($form.find(".is-invalid").length === 0) {
-      $form.find(".auth-form-error").addClass("d-none").text("");
+  function sendToLoginIfUnauthorized(xhr, $location) {
+    if (xhr && xhr.status === 401) {
+      $location.path("/login");
+      return true;
     }
-  });
+
+    return false;
+  }
+
+  function setCurrentUser($rootScope, user) {
+    $rootScope.currentUser = user || null;
+  }
+
+  function getPasswordStrength(password) {
+    var checks = {
+      length: password.length >= 8,
+      upper: /[A-Z]/.test(password),
+      lower: /[a-z]/.test(password),
+      number: /[0-9]/.test(password),
+    };
+    var passed = 0;
+
+    Object.keys(checks).forEach(function (key) {
+      if (checks[key]) {
+        passed += 1;
+      }
+    });
+
+    return {
+      checks: checks,
+      isValid: passed === 4,
+      label: passed === 4 ? "Strong" : passed >= 3 ? "Medium" : "Weak",
+      tone: passed === 4 ? "strong" : passed >= 3 ? "medium" : "weak",
+    };
+  }
+
+  function submitAuth(vm, $rootScope, $location, url) {
+    var username = (vm.form.username || "").trim();
+    var password = (vm.form.password || "").trim();
+
+    if (!username || !password) {
+      showFlash($rootScope, "Username and password are required.");
+      return;
+    }
+
+    vm.loading = true;
+
+    api("POST", url, {
+      username: username,
+      password: password,
+    })
+      .done(function (response) {
+        $rootScope.$applyAsync(function () {
+          setCurrentUser($rootScope, response.user);
+          $location.path("/chat");
+        });
+      })
+      .fail(function (xhr) {
+        $rootScope.$applyAsync(function () {
+          showFlash($rootScope, readError(xhr, "Request failed."));
+        });
+      })
+      .always(function () {
+        $rootScope.$applyAsync(function () {
+          vm.loading = false;
+        });
+      });
+  }
 
   var app = angular.module("zenoApp", ["ngRoute"]);
 
@@ -95,7 +124,7 @@
           controllerAs: "vm",
         })
         .otherwise({
-          redirectTo: "/chat",
+          redirectTo: "/login",
         });
 
       $locationProvider.html5Mode({
@@ -108,8 +137,8 @@
   app.run([
     "$rootScope",
     function ($rootScope) {
-      $rootScope.flashMessage = "";
       $rootScope.currentUser = null;
+      $rootScope.flashMessage = "";
     },
   ]);
 
@@ -118,22 +147,34 @@
     "$location",
     function ($rootScope, $location) {
       var vm = this;
+
       vm.currentUser = null;
       vm.flashMessage = "";
       vm.showHeader = true;
 
       vm.logout = function () {
-        $.ajax({
-          method: "POST",
-          url: "/api/auth/logout",
-        }).always(function () {
+        api("POST", "/api/auth/logout").always(function () {
           $rootScope.$applyAsync(function () {
-            $rootScope.currentUser = null;
+            setCurrentUser($rootScope, null);
             vm.currentUser = null;
             $location.path("/login");
           });
         });
       };
+
+      api("GET", "/api/auth/me")
+        .done(function (response) {
+          $rootScope.$applyAsync(function () {
+            setCurrentUser($rootScope, response.user);
+          });
+        })
+        .fail(function (xhr) {
+          $rootScope.$applyAsync(function () {
+            if ($location.path().indexOf("/chat") === 0) {
+              sendToLoginIfUnauthorized(xhr, $location);
+            }
+          });
+        });
 
       $rootScope.$watch("currentUser", function (user) {
         vm.currentUser = user;
@@ -155,75 +196,46 @@
   ]);
 
   app.controller("LoginController", [
-    "$location",
     "$rootScope",
-    function ($location, $rootScope) {
+    "$location",
+    function ($rootScope, $location) {
       var vm = this;
+
       vm.form = { username: "", password: "" };
       vm.loading = false;
 
       vm.login = function () {
-        vm.loading = true;
-        $.ajax({
-          method: "POST",
-          url: "/api/auth/login",
-          data: JSON.stringify(vm.form),
-          contentType: "application/json",
-          dataType: "json",
-        })
-          .done(function (response) {
-            $rootScope.$applyAsync(function () {
-              $rootScope.currentUser = response.user;
-              $location.path("/chat");
-            });
-          })
-          .fail(function (xhr) {
-            $rootScope.$applyAsync(function () {
-              showFlash($rootScope, readAjaxError(xhr, "Login failed."));
-            });
-          })
-          .always(function () {
-            $rootScope.$applyAsync(function () {
-              vm.loading = false;
-            });
-          });
+        submitAuth(vm, $rootScope, $location, "/api/auth/login");
       };
     },
   ]);
 
   app.controller("RegisterController", [
-    "$location",
     "$rootScope",
-    function ($location, $rootScope) {
+    "$location",
+    function ($rootScope, $location) {
       var vm = this;
+
       vm.form = { username: "", password: "" };
       vm.loading = false;
+      vm.passwordStrength = getPasswordStrength("");
+
+      vm.updatePasswordStrength = function () {
+        vm.passwordStrength = getPasswordStrength((vm.form.password || "").trim());
+      };
 
       vm.register = function () {
-        vm.loading = true;
-        $.ajax({
-          method: "POST",
-          url: "/api/auth/register",
-          data: JSON.stringify(vm.form),
-          contentType: "application/json",
-          dataType: "json",
-        })
-          .done(function (response) {
-            $rootScope.$applyAsync(function () {
-              $rootScope.currentUser = response.user;
-              $location.path("/chat");
-            });
-          })
-          .fail(function (xhr) {
-            $rootScope.$applyAsync(function () {
-              showFlash($rootScope, readAjaxError(xhr, "Registration failed."));
-            });
-          })
-          .always(function () {
-            $rootScope.$applyAsync(function () {
-              vm.loading = false;
-            });
-          });
+        vm.updatePasswordStrength();
+
+        if (!vm.passwordStrength.isValid) {
+          showFlash(
+            $rootScope,
+            "Password must be at least 8 characters and include uppercase, lowercase, and a number.",
+          );
+          return;
+        }
+
+        submitAuth(vm, $rootScope, $location, "/api/auth/register");
       };
     },
   ]);
@@ -236,6 +248,7 @@
     "$window",
     function ($rootScope, $location, $routeParams, $timeout, $window) {
       var vm = this;
+
       vm.history = [];
       vm.messages = [];
       vm.activeChatId = $routeParams.id || "";
@@ -276,57 +289,16 @@
         }, 0);
       };
 
-      vm.loadHistory = function () {
-        return $.getJSON("/api/chats")
-          .done(function (history) {
-            $rootScope.$applyAsync(function () {
-              vm.history = history;
-            });
-          })
-          .fail(function (xhr) {
-            $rootScope.$applyAsync(function () {
-              if (xhr.status === 401) {
-                $location.path("/login");
-                return;
-              }
+      vm.filteredHistory = function () {
+        var query = (vm.searchQuery || "").trim().toLowerCase();
 
-              showFlash($rootScope, "Could not load chats.");
-            });
-          });
-      };
-
-      vm.loadChat = function (chatId) {
-        if (!chatId) {
-          vm.messages = [];
-          vm.activeChatId = "";
-          return;
+        if (!query) {
+          return vm.history;
         }
 
-        vm.loading = true;
-        return $.getJSON("/api/chats/" + chatId)
-          .done(function (chat) {
-            $rootScope.$applyAsync(function () {
-              vm.activeChatId = chat._id;
-              vm.messages = chat.messages || [];
-              vm.scrollToBottom();
-            });
-          })
-          .fail(function (xhr) {
-            $rootScope.$applyAsync(function () {
-              if (xhr.status === 401) {
-                $location.path("/login");
-                return;
-              }
-
-              showFlash($rootScope, readAjaxError(xhr, "Could not load chat."));
-              $location.path("/chat");
-            });
-          })
-          .always(function () {
-            $rootScope.$applyAsync(function () {
-              vm.loading = false;
-            });
-          });
+        return vm.history.filter(function (chat) {
+          return (chat.title || "").toLowerCase().indexOf(query) !== -1;
+        });
       };
 
       vm.openChat = function (chatId) {
@@ -334,73 +306,10 @@
         $location.path("/chat/" + chatId);
       };
 
-      vm.deleteChat = function (chatId, event) {
-        if (event) {
-          event.preventDefault();
-          event.stopPropagation();
-        }
-
-        if (!chatId || vm.loading) {
-          return;
-        }
-
-        vm.loading = true;
-        $.ajax({
-          method: "DELETE",
-          url: "/api/chats/" + chatId,
-        })
-          .done(function () {
-            $rootScope.$applyAsync(function () {
-              vm.history = vm.history.filter(function (chat) {
-                return chat._id !== chatId;
-              });
-
-              if (vm.activeChatId === chatId) {
-                vm.activeChatId = "";
-                vm.messages = [];
-                vm.draft = "";
-                $location.path("/chat");
-              }
-            });
-          })
-          .fail(function (xhr) {
-            $rootScope.$applyAsync(function () {
-              if (xhr.status === 401) {
-                $location.path("/login");
-                return;
-              }
-
-              showFlash(
-                $rootScope,
-                readAjaxError(xhr, "Could not delete chat."),
-              );
-            });
-          })
-          .always(function () {
-            $rootScope.$applyAsync(function () {
-              vm.loading = false;
-            });
-          });
-      };
-
-      vm.filteredHistory = function () {
-        var query = (vm.searchQuery || "").trim().toLowerCase();
-        if (!query) {
-          return vm.history;
-        }
-
-        return vm.history.filter(function (chat) {
-          return (chat.title || "New chat").toLowerCase().indexOf(query) !== -1;
-        });
-      };
-
       vm.logout = function () {
-        $.ajax({
-          method: "POST",
-          url: "/api/auth/logout",
-        }).always(function () {
+        api("POST", "/api/auth/logout").always(function () {
           $rootScope.$applyAsync(function () {
-            $rootScope.currentUser = null;
+            setCurrentUser($rootScope, null);
             vm.currentUser = null;
             $location.path("/login");
           });
@@ -422,8 +331,105 @@
         }
       };
 
+      vm.loadHistory = function () {
+        api("GET", "/api/chats")
+          .done(function (history) {
+            $rootScope.$applyAsync(function () {
+              vm.history = history;
+            });
+          })
+          .fail(function (xhr) {
+            $rootScope.$applyAsync(function () {
+              if (sendToLoginIfUnauthorized(xhr, $location)) {
+                return;
+              }
+
+              showFlash($rootScope, "Could not load chats.");
+            });
+          });
+      };
+
+      vm.loadChat = function (chatId) {
+        if (!chatId) {
+          vm.activeChatId = "";
+          vm.messages = [];
+          return;
+        }
+
+        vm.loading = true;
+
+        api("GET", "/api/chats/" + chatId)
+          .done(function (chat) {
+            $rootScope.$applyAsync(function () {
+              vm.activeChatId = chat._id;
+              vm.messages = chat.messages || [];
+              vm.scrollToBottom();
+            });
+          })
+          .fail(function (xhr) {
+            $rootScope.$applyAsync(function () {
+              if (sendToLoginIfUnauthorized(xhr, $location)) {
+                return;
+              }
+
+              showFlash($rootScope, readError(xhr, "Could not load chat."));
+              $location.path("/chat");
+            });
+          })
+          .always(function () {
+            $rootScope.$applyAsync(function () {
+              vm.loading = false;
+            });
+          });
+      };
+
+      vm.deleteChat = function (chatId, event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+
+        if (!chatId || vm.loading) {
+          return;
+        }
+
+        vm.loading = true;
+
+        api("DELETE", "/api/chats/" + chatId)
+          .done(function () {
+            $rootScope.$applyAsync(function () {
+              vm.history = vm.history.filter(function (chat) {
+                return chat._id !== chatId;
+              });
+
+              if (vm.activeChatId === chatId) {
+                vm.activeChatId = "";
+                vm.messages = [];
+                vm.draft = "";
+                $location.path("/chat");
+              }
+            });
+          })
+          .fail(function (xhr) {
+            $rootScope.$applyAsync(function () {
+              if (sendToLoginIfUnauthorized(xhr, $location)) {
+                return;
+              }
+
+              showFlash($rootScope, readError(xhr, "Could not delete chat."));
+            });
+          })
+          .always(function () {
+            $rootScope.$applyAsync(function () {
+              vm.loading = false;
+            });
+          });
+      };
+
       vm.sendMessage = function () {
         var text = (vm.draft || "").trim();
+        var url = "/api/chats";
+
         if (!text || vm.loading) {
           return;
         }
@@ -434,73 +440,41 @@
         if (!vm.activeChatId) {
           vm.messages = [{ role: "user", content: text }];
           vm.scrollToBottom();
-
-          $.ajax({
-            method: "POST",
-            url: "/api/chats",
-            data: JSON.stringify({ message: text }),
-            contentType: "application/json",
-            dataType: "json",
-          })
-            .done(function (chat) {
-              $rootScope.$applyAsync(function () {
-                vm.activeChatId = chat._id;
-                vm.messages = chat.messages || [];
-                vm.loadHistory();
-                $location.path("/chat/" + chat._id);
-                vm.scrollToBottom();
-              });
-            })
-            .fail(function (xhr) {
-              $rootScope.$applyAsync(function () {
-                vm.messages = [];
-
-                if (xhr.status === 401) {
-                  $location.path("/login");
-                  return;
-                }
-
-                showFlash(
-                  $rootScope,
-                  readAjaxError(xhr, "Could not start chat."),
-                );
-              });
-            })
-            .always(function () {
-              $rootScope.$applyAsync(function () {
-                vm.loading = false;
-              });
-            });
-          return;
+        } else {
+          vm.messages = vm.messages.concat([{ role: "user", content: text }]);
+          vm.scrollToBottom();
+          url = "/api/chats/" + vm.activeChatId + "/messages";
         }
 
-        vm.messages = vm.messages.concat([{ role: "user", content: text }]);
-        vm.scrollToBottom();
-
-        $.ajax({
-          method: "POST",
-          url: "/api/chats/" + vm.activeChatId + "/messages",
-          data: JSON.stringify({ message: text }),
-          contentType: "application/json",
-          dataType: "json",
-        })
+        api("POST", url, { message: text })
           .done(function (chat) {
             $rootScope.$applyAsync(function () {
+              vm.activeChatId = chat._id;
               vm.messages = chat.messages || [];
               vm.loadHistory();
               vm.scrollToBottom();
+
+              if ($location.path() !== "/chat/" + chat._id) {
+                $location.path("/chat/" + chat._id);
+              }
             });
           })
           .fail(function (xhr) {
             $rootScope.$applyAsync(function () {
-              if (xhr.status === 401) {
-                $location.path("/login");
+              if (!vm.activeChatId) {
+                vm.messages = [];
+              }
+
+              if (sendToLoginIfUnauthorized(xhr, $location)) {
                 return;
               }
 
               showFlash(
                 $rootScope,
-                readAjaxError(xhr, "Could not send message."),
+                readError(
+                  xhr,
+                  vm.activeChatId ? "Could not send message." : "Could not start chat.",
+                ),
               );
             });
           })
@@ -511,23 +485,8 @@
           });
       };
 
-      $.getJSON("/api/auth/me")
-        .done(function (response) {
-          $rootScope.$applyAsync(function () {
-            $rootScope.currentUser = response.user;
-            vm.currentUser = response.user;
-          });
-        })
-        .fail(function (xhr) {
-          $rootScope.$applyAsync(function () {
-            if (xhr.status === 401) {
-              $location.path("/login");
-            }
-          });
-        });
-
       vm.loadHistory();
-      vm.loadChat($routeParams.id || "");
+      vm.loadChat(vm.activeChatId);
       vm.syncSidebarState();
 
       angular.element($window).on("resize", function () {

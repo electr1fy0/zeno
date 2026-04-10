@@ -1,9 +1,8 @@
 import { createApp } from "./app.js";
-import { config, validateRuntimeConfig } from "./config.js";
+import { config } from "./config.js";
 import { connectDb } from "./db/db.js";
 
 async function main() {
-  validateRuntimeConfig();
   await connectDb();
   const app = createApp();
 

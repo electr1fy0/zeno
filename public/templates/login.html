@@ -31,7 +31,7 @@
             <h2>Welcome back</h2>
           </div>
 
-          <form class="auth-form" data-auth-mode="login" ng-submit="vm.login()" novalidate>
+          <form class="auth-form" data-auth-mode="login" ng-submit="vm.login()">
             <div class="mb-3">
               <label for="login-username" class="form-label">Username</label>
               <input
@@ -40,8 +40,8 @@
                 class="form-control"
                 ng-model="vm.form.username"
                 required
+                minlength="3"
               />
-              <div class="invalid-feedback">Enter a username with at least 3 characters.</div>
             </div>
 
             <div class="mb-4">
@@ -52,11 +52,9 @@
                 class="form-control"
                 ng-model="vm.form.password"
                 required
+                minlength="4"
               />
-              <div class="invalid-feedback">Enter a password with at least 4 characters.</div>
             </div>
-
-            <div class="auth-form-error d-none"></div>
 
             <div class="d-flex flex-column gap-3">
               <button type="submit" class="btn btn-primary btn-lg auth-submit" ng-disabled="vm.loading">
