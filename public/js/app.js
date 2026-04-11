@@ -40,43 +40,74 @@
     $rootScope.currentUser = user || null;
   }
 
-  function getPasswordStrength(password) {
-    var checks = {
-      length: password.length >= 8,
-      upper: /[A-Z]/.test(password),
-      lower: /[a-z]/.test(password),
-      number: /[0-9]/.test(password),
-    };
-    var passed = 0;
+  function isEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  }
 
-    Object.keys(checks).forEach(function (key) {
-      if (checks[key]) {
-        passed += 1;
-      }
-    });
+  function isStrongPassword(value) {
+    return (
+      value.length >= 8 &&
+      /[0-9]/.test(value) &&
+      /[A-Z]/.test(value) &&
+      /[a-z]/.test(value) &&
+      /[^A-Za-z0-9]/.test(value)
+    );
+  }
+
+  function readAuthForm(vm, event) {
+    var form = event && event.currentTarget ? $(event.currentTarget) : null;
 
     return {
-      checks: checks,
-      isValid: passed === 4,
-      label: passed === 4 ? "Strong" : passed >= 3 ? "Medium" : "Weak",
-      tone: passed === 4 ? "strong" : passed >= 3 ? "medium" : "weak",
+      email: (form ? form.find('[name="email"]').val() : vm.form.email) || "",
+      password: (form ? form.find('[name="password"]').val() : vm.form.password) || "",
     };
   }
 
-  function submitAuth(vm, $rootScope, $location, url) {
-    var username = (vm.form.username || "").trim();
-    var password = (vm.form.password || "").trim();
+  function validateAuthForm(vm, mode, event) {
+    var form = readAuthForm(vm, event);
+    var email = form.email.trim().toLowerCase();
+    var password = form.password;
 
-    if (!username || !password) {
-      showFlash($rootScope, "Username and password are required.");
+    if (!email) {
+      return { message: "Enter an email." };
+    }
+
+    if (!isEmail(email)) {
+      return { message: "Enter a valid email." };
+    }
+
+    if (!password.trim()) {
+      return { message: "Enter a password." };
+    }
+
+    if (mode === "register" && !isStrongPassword(password)) {
+      return {
+        message:
+          "Password needs 8+ characters, a number, uppercase, lowercase, and a symbol.",
+      };
+    }
+
+    return {
+      email: email,
+      password: password,
+    };
+  }
+
+  function submitAuth(vm, $rootScope, $location, mode, url, event) {
+    var result = validateAuthForm(vm, mode, event);
+
+    if (result.message) {
+      vm.warning = result.message;
       return;
     }
+
+    vm.warning = "";
 
     vm.loading = true;
 
     api("POST", url, {
-      username: username,
-      password: password,
+      email: result.email,
+      password: result.password,
     })
       .done(function (response) {
         $rootScope.$applyAsync(function () {
@@ -86,7 +117,7 @@
       })
       .fail(function (xhr) {
         $rootScope.$applyAsync(function () {
-          showFlash($rootScope, readError(xhr, "Request failed."));
+          vm.warning = readError(xhr, "Request failed.");
         });
       })
       .always(function () {
@@ -221,11 +252,19 @@
     function ($rootScope, $location) {
       var vm = this;
 
-      vm.form = { username: "", password: "" };
+      vm.form = { email: "", password: "" };
       vm.loading = false;
+      vm.warning = "";
 
-      vm.login = function () {
-        submitAuth(vm, $rootScope, $location, "/api/auth/login");
+      vm.login = function (event) {
+        submitAuth(
+          vm,
+          $rootScope,
+          $location,
+          "login",
+          "/api/auth/login",
+          event,
+        );
       };
     },
   ]);
@@ -236,28 +275,19 @@
     function ($rootScope, $location) {
       var vm = this;
 
-      vm.form = { username: "", password: "" };
+      vm.form = { email: "", password: "" };
       vm.loading = false;
-      vm.passwordStrength = getPasswordStrength("");
+      vm.warning = "";
 
-      vm.updatePasswordStrength = function () {
-        vm.passwordStrength = getPasswordStrength(
-          (vm.form.password || "").trim(),
+      vm.register = function (event) {
+        submitAuth(
+          vm,
+          $rootScope,
+          $location,
+          "register",
+          "/api/auth/register",
+          event,
         );
-      };
-
-      vm.register = function () {
-        vm.updatePasswordStrength();
-
-        if (!vm.passwordStrength.isValid) {
-          showFlash(
-            $rootScope,
-            "Password must be at least 8 characters and include uppercase, lowercase, and a number.",
-          );
-          return;
-        }
-
-        submitAuth(vm, $rootScope, $location, "/api/auth/register");
       };
     },
   ]);

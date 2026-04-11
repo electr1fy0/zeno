@@ -5,21 +5,47 @@ import { getDb } from "../db/db.js";
 
 const authRouter = express.Router();
 
-function readCredentials(body) {
-  const username = body.username.trim().toLowerCase();
-  const password = body.password.trim().toLowerCase();
+function isEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
-  if (!username || !password) {
-    return null;
+function isStrongPassword(value) {
+  return (
+    value.length >= 8 &&
+    /[0-9]/.test(value) &&
+    /[A-Z]/.test(value) &&
+    /[a-z]/.test(value) &&
+    /[^A-Za-z0-9]/.test(value)
+  );
+}
+
+function readCredentials(body) {
+  if (
+    !body ||
+    typeof body.email !== "string" ||
+    typeof body.password !== "string"
+  ) {
+    return { error: "Email and password are required" };
   }
 
-  return { username, password };
+  const email = body.email.trim().toLowerCase();
+  const password = body.password;
+
+  if (!email || !password.trim()) {
+    return { error: "Email and password are required" };
+  }
+
+  if (!isEmail(email)) {
+    return { error: "Enter a valid email" };
+  }
+
+  return { email, password };
 }
 
 function toPublicUser(user) {
   return {
     id: user._id.toHexString(),
-    username: user.username,
+    email: user.email,
   };
 }
 
@@ -37,52 +63,60 @@ function clearSession(req, res) {
 
 authRouter.post("/register", async (req, res) => {
   const credentials = readCredentials(req.body);
-  if (!credentials) {
-    res.status(400).json({ error: "Username and password are required" });
+  if (credentials.error) {
+    res.status(400).json({ error: credentials.error });
+    return;
+  }
+
+  if (!isStrongPassword(credentials.password)) {
+    res.status(400).json({
+      error:
+        "Password needs 8+ characters, a number, uppercase, lowercase, and a symbol.",
+    });
     return;
   }
 
   const db = getDb();
   const users = db.collection("users");
-  const existingUser = await users.findOne({ username: credentials.username });
+  const existingUser = await users.findOne({ email: credentials.email });
   if (existingUser) {
-    res.status(409).json({ error: "Username is already taken" });
+    res.status(409).json({ error: "Email is already registered" });
     return;
   }
 
   const passwordHash = await bcrypt.hash(credentials.password, 10);
   const createdAt = new Date();
   const result = await users.insertOne({
-    username: credentials.username,
+    email: credentials.email,
     passwordHash,
     createdAt,
   });
 
   req.session.userId = result.insertedId.toHexString();
-  req.session.username = credentials.username;
+  req.session.email = credentials.email;
 
   res.status(201).json({
     user: {
       id: result.insertedId.toHexString(),
-      username: credentials.username,
+      email: credentials.email,
     },
   });
 });
 
 authRouter.post("/login", async (req, res) => {
   const credentials = readCredentials(req.body);
-  if (!credentials) {
-    res.status(400).json({ error: "Username and password are required" });
+  if (credentials.error) {
+    res.status(400).json({ error: credentials.error });
     return;
   }
 
   const db = getDb();
   const user = await db.collection("users").findOne({
-    username: credentials.username,
+    email: credentials.email,
   });
 
   if (!user) {
-    res.status(401).json({ error: "Invalid username or password" });
+    res.status(401).json({ error: "Invalid email or password" });
     return;
   }
 
@@ -91,12 +125,12 @@ authRouter.post("/login", async (req, res) => {
     user.passwordHash,
   );
   if (!isValidPassword) {
-    res.status(401).json({ error: "Invalid username or password" });
+    res.status(401).json({ error: "Invalid email or password" });
     return;
   }
 
   req.session.userId = user._id.toHexString();
-  req.session.username = user.username;
+  req.session.email = user.email;
 
   res.json({ user: toPublicUser(user) });
 });

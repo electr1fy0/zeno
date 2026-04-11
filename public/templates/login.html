@@ -31,21 +31,22 @@
             <h2>Welcome back</h2>
           </div>
 
-          <form class="auth-form" data-auth-mode="login" ng-submit="vm.login()" novalidate>
+          <form class="auth-form" data-auth-mode="login" ng-submit="vm.login($event)" novalidate>
+            <p class="auth-form-error" ng-if="vm.warning">{{ vm.warning }}</p>
+
             <div class="mb-3">
-              <label for="login-username" class="form-label">Username</label>
+              <label for="login-email" class="form-label">Email</label>
               <input
-                id="login-username"
-                name="username"
-                type="text"
+                id="login-email"
+                name="email"
+                type="email"
                 class="form-control"
-                ng-model="vm.form.username"
-                autocomplete="username"
+                ng-model="vm.form.email"
+                autocomplete="email"
                 autocapitalize="none"
                 spellcheck="false"
                 enterkeyhint="next"
                 required
-                minlength="3"
               />
             </div>
 
