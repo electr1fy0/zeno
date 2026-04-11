@@ -16,7 +16,12 @@ function toNoteSummary(note) {
 }
 
 function toStoredEmbedding(embedding) {
-  return embedding.map(Number) | null;
+  if (!Array.isArray(embedding)) {
+    return null;
+  }
+
+  const values = embedding.map(Number).filter(Number.isFinite);
+  return values.length ? values : null;
 }
 
 async function createNote(userId, content, embedding) {

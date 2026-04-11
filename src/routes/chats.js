@@ -19,7 +19,11 @@ function parseId(id) {
 }
 
 function readMessage(body) {
-  return body.message.trim() | null;
+  if (!body || typeof body.message !== "string") {
+    return null;
+  }
+
+  return body.message.trim() || null;
 }
 
 function buildChatTitle(message) {

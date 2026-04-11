@@ -31,14 +31,19 @@
             <h2>Welcome back</h2>
           </div>
 
-          <form class="auth-form" data-auth-mode="login" ng-submit="vm.login()">
+          <form class="auth-form" data-auth-mode="login" ng-submit="vm.login()" novalidate>
             <div class="mb-3">
               <label for="login-username" class="form-label">Username</label>
               <input
                 id="login-username"
+                name="username"
                 type="text"
                 class="form-control"
                 ng-model="vm.form.username"
+                autocomplete="username"
+                autocapitalize="none"
+                spellcheck="false"
+                enterkeyhint="next"
                 required
                 minlength="3"
               />
@@ -48,9 +53,12 @@
               <label for="login-password" class="form-label">Password</label>
               <input
                 id="login-password"
+                name="password"
                 type="password"
                 class="form-control"
                 ng-model="vm.form.password"
+                autocomplete="current-password"
+                enterkeyhint="go"
                 required
                 minlength="4"
               />
