@@ -41,7 +41,7 @@
   }
 
   function isEmail(value) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    return /^\S+@\S+\.\S{2,}$/.test(value);
   }
 
   function isStrongPassword(value) {
@@ -59,7 +59,8 @@
 
     return {
       email: (form ? form.find('[name="email"]').val() : vm.form.email) || "",
-      password: (form ? form.find('[name="password"]').val() : vm.form.password) || "",
+      password:
+        (form ? form.find('[name="password"]').val() : vm.form.password) || "",
     };
   }
 
@@ -208,7 +209,10 @@
           })
           .fail(function (xhr) {
             $rootScope.$applyAsync(function () {
-              showFlash($rootScope, readError(xhr, "Could not delete account."));
+              showFlash(
+                $rootScope,
+                readError(xhr, "Could not delete account."),
+              );
             });
           });
       };
@@ -391,7 +395,10 @@
                 return;
               }
 
-              showFlash($rootScope, readError(xhr, "Could not delete account."));
+              showFlash(
+                $rootScope,
+                readError(xhr, "Could not delete account."),
+              );
             });
           });
       };
