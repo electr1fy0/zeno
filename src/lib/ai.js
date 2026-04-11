@@ -31,6 +31,7 @@ Rules:
 - If a tool reports ambiguous matches, ask the user to clarify which one they mean.
 - If the user asks to list notes, present them neatly as concise bullets.
 - Keep replies clear and concise unless the user asks for more detail.
+- Avoid using markdown formatting.
 `.trim();
 
 async function getEmbedding(text) {
