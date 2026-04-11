@@ -36,6 +36,14 @@
     return false;
   }
 
+  function isAuthPath(path) {
+    return path === "/login" || path === "/register";
+  }
+
+  function isChatPath(path) {
+    return path.indexOf("/chat") === 0;
+  }
+
   function setCurrentUser($rootScope, user) {
     $rootScope.currentUser = user || null;
   }
@@ -184,6 +192,12 @@
       vm.flashMessage = "";
       vm.showHeader = true;
 
+      vm.syncAuthRoute = function () {
+        if ($rootScope.currentUser && isAuthPath($location.path())) {
+          $location.path("/chat");
+        }
+      };
+
       vm.logout = function () {
         api("POST", "/api/auth/logout").always(function () {
           $rootScope.$applyAsync(function () {
@@ -221,11 +235,12 @@
         .done(function (response) {
           $rootScope.$applyAsync(function () {
             setCurrentUser($rootScope, response.user);
+            vm.syncAuthRoute();
           });
         })
         .fail(function (xhr) {
           $rootScope.$applyAsync(function () {
-            if ($location.path().indexOf("/chat") === 0) {
+            if (isChatPath($location.path())) {
               sendToLoginIfUnauthorized(xhr, $location);
             }
           });
@@ -233,6 +248,7 @@
 
       $rootScope.$watch("currentUser", function (user) {
         vm.currentUser = user;
+        vm.syncAuthRoute();
       });
 
       $rootScope.$watch("flashMessage", function (message) {
@@ -244,7 +260,8 @@
           return $location.path();
         },
         function (path) {
-          vm.showHeader = path === "/login" || path === "/register";
+          vm.showHeader = isAuthPath(path);
+          vm.syncAuthRoute();
         },
       );
     },
